@@ -1670,7 +1670,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestMem.grade]}}>{latestMem.grade}</span>
                     <span className="text-[11px] text-gray-500">{fmtBoth(latestMem.date)}</span>
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-2">المعلم: {staff.find(s=>s.id===latestMem.teacherId)?.name || "—"} {latestMem.notes ? "• " + latestMem.notes : ""}</p>
+
                 </div>
               ) : (
                 <div className="text-center py-4">
@@ -1697,7 +1697,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestSmall.grade]}}>{latestSmall.grade}</span>
                     <span className="text-[11px] text-gray-500">{fmtBoth(latestSmall.date)}</span>
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-2">المعلم: {staff.find(s=>s.id===latestSmall.teacherId)?.name || "—"}</p>
+
                 </div>
               ) : (
                 <div className="text-center py-4">
@@ -1724,7 +1724,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestLarge.grade]}}>{latestLarge.grade}</span>
                     <span className="text-[11px] text-gray-500">{fmtBoth(latestLarge.date)}</span>
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-2">المعلم: {staff.find(s=>s.id===latestLarge.teacherId)?.name || "—"}</p>
+
                 </div>
               ) : (
                 <div className="text-center py-4">
