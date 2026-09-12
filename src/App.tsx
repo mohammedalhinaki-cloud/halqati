@@ -206,6 +206,7 @@ export default function App() {
   const [filterCircle, setFilterCircle] = useState<string>("all")
   const [supabaseModal, setSupabaseModal] = useState(false)
   const [planModal, setPlanModal] = useState(false)
+  const [showTeacherPlan, setShowTeacherPlan] = useState(false)
   const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => localStorage.getItem("halqati_supabase_url") || "")
   const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => localStorage.getItem("halqati_supabase_anon_key") || "")
   const [cloudStatus, setCloudStatus] = useState<string | null>(null)
@@ -816,7 +817,8 @@ export default function App() {
             </span>}
           </div>
           <div className="flex items-center gap-2">
-            {currentUser?.role !== "supervisor" && <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
+            {isOwnerOrAdmin && <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
+            {currentUser?.role === "teacher" && <button onClick={() => setShowTeacherPlan(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
             {isOwner && <button onClick={() => setSupabaseModal(true)} className="px-3 py-1.5 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-gray-50">⚙️ Supabase</button>}
             <button onClick={() => { setCurrentUserId(null); showToast("تم تسجيل الخروج") }} className="px-3 py-1.5 rounded-full bg-[#B3492C] hover:bg-[#963d25] text-white text-xs font-bold">خروج</button>
           </div>
@@ -912,8 +914,76 @@ export default function App() {
         </main>
       ) : (
       <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-5">
-        {/* تبويب المدير — الطلاب الحاصلون على ممتاز مرتبون حسب الحلقات */}
-        {isOwnerOrAdmin && (
+        {currentUser?.role === "teacher" && showTeacherPlan ? (
+          <div className="space-y-4">
+            <button onClick={()=> setShowTeacherPlan(false)} className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-[#FAF9F4] transition">
+              <span>→</span> رجوع للوحة التحكم
+            </button>
+            <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b bg-[#FAF9F4]/60">
+                <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📅 الخطة السنوية</h2>
+                <p className="text-xs text-gray-500 mt-1">تفاصيل السنة الدراسية وأيام التسميع والإجازات المعتمدة — عرض فقط</p>
+              </div>
+              <div className="p-6 space-y-6">
+                <div>
+                  <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> السنة الدراسية</h3>
+                  <div className="grid md:grid-cols-2 gap-3 mt-3">
+                    <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
+                      <p className="text-[11px] font-bold text-gray-500">تاريخ البداية</p>
+                      <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.startDate ? fmtBoth(plan.startDate) : "غير محدد"}</p>
+                    </div>
+                    <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
+                      <p className="text-[11px] font-bold text-gray-500">تاريخ النهاية</p>
+                      <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.endDate ? fmtBoth(plan.endDate) : "غير محدد"}</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> أيام التسميع الأسبوعية</h3>
+                  <p className="text-[11px] text-gray-500 mt-1">الأيام المفعّلة هي أيام الحضور والتسميع المعتمدة</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                    {WEEKDAYS.map((d, i) => (
+                      <div key={i} className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition ${plan.activeWeekdays.includes(i) ? "bg-[#1F5E3A] text-white border-[#1F5E3A] shadow-sm" : "bg-white text-gray-400 border-[#E1E5DA]"}`}>
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-center mt-3 px-3 py-2 rounded-xl bg-[#E7EFE7] border border-[#1F5E3A]/20 font-bold" style={{color:"#1F5E3A"}}>
+                    الجدول الأسبوعي: {plan.activeWeekdays.length ? plan.activeWeekdays.map(i=> WEEKDAYS[i]).join("، ") : "لم يتم تحديد أيام"}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> الإجازات والمناسبات <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#E7EFE7] border border-[#1F5E3A]/20 text-[#1F5E3A]">{plan.holidays.length}</span></h3>
+                  {plan.holidays.length===0 ? (
+                    <div className="text-center py-8 bg-[#FAF9F4] rounded-xl border border-dashed mt-3">
+                      <p className="text-2xl mb-1">🏖️</p>
+                      <p className="text-xs font-bold text-gray-600">لا توجد إجازات مسجلة حالياً</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 mt-3">
+                      {plan.holidays.map(h=> (
+                        <div key={h.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4] border-[#E1E5DA]">
+                          <div>
+                            <p className="font-bold text-xs" style={{color:"#163F27"}}>{h.name}</p>
+                            <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(h.startDate)} إلى {fmtBoth(h.endDate)}</p>
+                          </div>
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white border text-gray-600">إجازة</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="bg-[#FAF9F4] border border-[#E1E5DA] rounded-xl p-3 text-center">
+                  <p className="text-[11px] text-gray-500">💡 هذه الخطة معتمدة من إدارة الحلقة وتُحدّث تلقائياً — للعرض فقط</p>
+                </div>
+              </div>
+            </div>
+            <button onClick={()=> setShowTeacherPlan(false)} className="w-full py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm transition">العودة للوحة التحكم</button>
+          </div>
+        ) : (
+          <>
+        {/* تبويب المدير — الطلاب الحاصلون على ممتاز مرتبون حسب الحلقات (للمدير فقط) */}
+        {currentUser?.role === "admin" && (
           <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden mb-6">
             <div className="px-4 py-3 border-b bg-[#FAF9F4]/60 flex items-center justify-between">
               <h3 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>🏆 الطلاب الحاصلون على ممتاز <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#C9A227]/15 text-[#7a5a00] border border-[#C9A227]/30">{visibleStudents.filter(s=>[...s.memorizationLog, ...s.reviewLog].some((e:any)=>e.grade==="ممتاز")).length} طالب</span></h3>
@@ -988,7 +1058,8 @@ export default function App() {
               </select>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button onClick={() => setPlanModal(true)} className="lg:hidden px-3 py-2 rounded-xl bg-[#E7EFE7] text-[#1F5E3A] text-xs font-bold border">📅 الخطة</button>
+              {isOwnerOrAdmin && <button onClick={() => setPlanModal(true)} className="lg:hidden px-3 py-2 rounded-xl bg-[#E7EFE7] text-[#1F5E3A] text-xs font-bold border">📅 الخطة</button>}
+              {currentUser?.role === "teacher" && <button onClick={() => setShowTeacherPlan(true)} className="lg:hidden px-3 py-2 rounded-xl bg-[#E7EFE7] text-[#1F5E3A] text-xs font-bold border">📅 الخطة</button>}
               <button onClick={() => { setStudentForm({ name: "", phone: "", circleId: filterCircle !== "all" ? filterCircle : "" }); setEditingStudentId(null); setShowStudentModal(true) }} className="px-4 py-2 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ إضافة طالب</button>
             </div>
           </div>
@@ -1168,6 +1239,8 @@ export default function App() {
             })}
           </div>
         )}
+          </>
+        )}
       </main>
       )}
 
@@ -1322,7 +1395,7 @@ export default function App() {
         </Modal>
       )}
 
-      {planModal && currentUser?.role !== "supervisor" && (
+      {planModal && isOwnerOrAdmin && (
         <PlanModal plan={plan} setPlan={setPlan} onClose={() => setPlanModal(false)} onToast={showToast} />
       )}
 
