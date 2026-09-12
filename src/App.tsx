@@ -1846,14 +1846,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
             </div>
           )}
         </div>
-        <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">سجل التحضير</h4>
-          {(() => {
-            const h = attendance.filter(a=>a.studentId===student.id).sort((a,b)=> b.date.localeCompare(a.date))
-            if(h.length===0) return <p className="text-xs text-gray-400 text-center py-4">لا يوجد سجل تحضير بعد</p>
-            return <div className="space-y-1.5 max-h-[240px] overflow-auto pr-1">{h.slice(0,20).map(r=> (<div key={r.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-[#FAF9F4]"><p className="font-bold text-xs">{fmtBoth(r.date)}</p><span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[r.status]}`}>{r.status}</span></div>))}</div>
-          })()}
-        </div>
+
       </div>
     </div>
   )
