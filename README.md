@@ -27,3 +27,8 @@ npm run build
 
 ## الإصدار
 v1.0 — 2026
+
+## النشر على GitHub Pages
+المشروع مُجهز للنشر التلقائي عبر GitHub Actions.
+عند كل push إلى `main` سيتم البناء والنشر على:
+https://mohammedalhinaki-cloud.github.io/halqati/
