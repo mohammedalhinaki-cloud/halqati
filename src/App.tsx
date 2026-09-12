@@ -861,13 +861,13 @@ export default function App() {
             )}
           </div>
 
-          {/* Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          {/* Summary — مصغر أفقي لتوفير المساحة */}
+          <div className="grid grid-cols-4 gap-1.5 mb-3">
             {ATTENDANCE_STATUS.map(st=> (
-              <div key={st} className="bg-white rounded-2xl p-4 border shadow-sm text-center">
-                <p className="text-[11px] font-bold text-gray-500">{st}</p>
-                <p className="font-black text-2xl mt-1" style={{color:ATTENDANCE_COLOR[st]}}>{(supervisorStats as any)[st]}</p>
-                <p className="text-[11px] text-gray-400 mt-1">طالب</p>
+              <div key={st} className="bg-white rounded-xl p-2 md:p-2.5 border shadow-sm text-center">
+                <p className="text-[10px] font-bold text-gray-500 leading-none">{st}</p>
+                <p className="font-black text-lg md:text-xl leading-none mt-1" style={{color:ATTENDANCE_COLOR[st]}}>{(supervisorStats as any)[st]}</p>
+                <p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p>
               </div>
             ))}
           </div>
@@ -1024,13 +1024,13 @@ export default function App() {
                 </select>
               </div>
             </div>
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-3 bg-gray-50/50 border-b">
-              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">حاضر</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["حاضر"]}}>{attendanceStatsForDate["حاضر"]}</p></div>
-              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">غائب</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["غائب"]}}>{attendanceStatsForDate["غائب"]}</p></div>
-              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">متأخر</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["متأخر"]}}>{attendanceStatsForDate["متأخر"]}</p></div>
-              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">غائب بعذر</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["غائب بعذر"]}}>{attendanceStatsForDate["غائب بعذر"]}</p></div>
-              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">الإجمالي المسجل</p><p className="font-black text-lg" style={{color:"#163F27"}}>{attendanceStatsForDate.total} / {visibleStudents.length}</p></div>
+            {/* Stats — مصغر أفقي */}
+            <div className="grid grid-cols-5 gap-1.5 p-2 bg-gray-50/50 border-b">
+              <div className="bg-white rounded-xl p-2 border text-center"><p className="text-[10px] text-gray-500 font-bold leading-none">حاضر</p><p className="font-black text-base md:text-lg leading-none mt-1" style={{color:ATTENDANCE_COLOR["حاضر"]}}>{attendanceStatsForDate["حاضر"]}</p><p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p></div>
+              <div className="bg-white rounded-xl p-2 border text-center"><p className="text-[10px] text-gray-500 font-bold leading-none">غائب</p><p className="font-black text-base md:text-lg leading-none mt-1" style={{color:ATTENDANCE_COLOR["غائب"]}}>{attendanceStatsForDate["غائب"]}</p><p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p></div>
+              <div className="bg-white rounded-xl p-2 border text-center"><p className="text-[10px] text-gray-500 font-bold leading-none">متأخر</p><p className="font-black text-base md:text-lg leading-none mt-1" style={{color:ATTENDANCE_COLOR["متأخر"]}}>{attendanceStatsForDate["متأخر"]}</p><p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p></div>
+              <div className="bg-white rounded-xl p-2 border text-center"><p className="text-[10px] text-gray-500 font-bold leading-none">غائب بعذر</p><p className="font-black text-base md:text-lg leading-none mt-1" style={{color:ATTENDANCE_COLOR["غائب بعذر"]}}>{attendanceStatsForDate["غائب بعذر"]}</p><p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p></div>
+              <div className="bg-white rounded-xl p-2 border text-center"><p className="text-[10px] text-gray-500 font-bold leading-none">الإجمالي</p><p className="font-black text-base md:text-lg leading-none mt-1" style={{color:"#163F27"}}>{attendanceStatsForDate.total}/{visibleStudents.length}</p><p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p></div>
             </div>
             {/* Bulk */}
             <div className="flex gap-2 p-3 border-b bg-white flex-wrap">
