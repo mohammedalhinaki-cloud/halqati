@@ -680,7 +680,7 @@ export default function App() {
                     <input value={ownerPhone} onChange={e => setOwnerPhone(e.target.value)} placeholder="05XXXXXXXX" className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[#E1E5DA] text-sm focus:outline-none focus:ring-2 focus:ring-[#1F5E3A]" dir="ltr" />
                     {loginError && <p className="text-xs text-red-600 mt-2">{loginError}</p>}
                     <button onClick={handleCreateOwner} className="w-full mt-4 py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm transition">إنشاء حساب المالك والدخول</button>
-                    <button onClick={loadDemo} className="w-full mt-2 py-2 rounded-xl bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] font-bold text-xs transition">✨ تعبئة بيانات تجريبية للتجربة السريعة</button>
+                    
                   </div>
                 ) : (
                   <div>
@@ -690,15 +690,15 @@ export default function App() {
                     <input value={loginPhone} onChange={e => setLoginPhone(e.target.value)} placeholder="05XXXXXXXX" className="w-full px-3 py-2.5 rounded-xl border border-[#E1E5DA] text-sm focus:outline-none focus:ring-2 focus:ring-[#1F5E3A]" dir="ltr" />
                     {loginError && <p className="text-xs text-red-600 mt-2">{loginError}</p>}
                     <button onClick={handleLogin} className="w-full mt-4 py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm transition">دخول النظام</button>
-                    <button onClick={loadDemo} className="w-full mt-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200 transition">✨ أو تعبئة بيانات نموذجية تجريبية للتجربة السريعة</button>
+                    
                     {false && <button onClick={() => setSupabaseModal(true)} className="w-full mt-2 py-2 rounded-xl bg-white border border-[#E1E5DA] text-[#1F5E3A] font-bold text-xs hover:bg-gray-50 transition">⚙️ إعداد وحفظ مفاتيح Supabase</button>}
-                    <p className="text-[11px] text-center text-gray-400 mt-3">💡 هل ترغب بحفظ البيانات سحابياً؟ اربط Supabase لتبقى بياناتك محفوظة ومزامنة بين كل الأجهزة.</p>
+                    
                   </div>
                 )}
               </div>
             </div>
 
-            <p className="text-center text-[11px] text-gray-400 mt-4">حلقتي © 2026 — للملاحظات: ‎+966507804528</p>
+            
           </div>
         </div>
 
