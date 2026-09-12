@@ -1649,20 +1649,17 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           </div>
         </div>
 
-        {/* ===== المطلوب الآن — في المقدمة وبشكل بارز — ألوان موحدة بنظام حلقتي ===== */}
-        <div className="bg-[#1F5E3A] rounded-2xl p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-white">
-            <h4 className="font-black text-sm flex items-center gap-2">🎯 المطلوب منك الآن <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/15 border border-white/20 backdrop-blur">ركّز هنا أولاً</span></h4>
-            <span className="text-[11px] opacity-80 hidden sm:inline">آخر ما سجّله المعلم — ابدأ به قبل فتح السجل السابق</span>
-          </div>
-          <p className="text-xs text-white/80 mt-1 sm:hidden">آخر ما سجّله المعلم — ابدأ به قبل فتح السجل السابق</p>
+        {/* ===== المطلوب غداً ===== */}
+        <div className="bg-[#1F5E3A] rounded-2xl p-4 shadow-sm text-center">
+          <h4 className="font-black text-sm text-white">المطلوب غداً</h4>
+          <div className="mt-2 text-white/50 text-[10px] tracking-[3px]">....................................</div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-3">
           {/* حفظ جديد — لون موحد */}
           <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMem ? "#1F5E3A" : "#E1E5DA"}}>
             <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMem ? "#1F5E3A" : "#F3F4F6"}}>
-              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>📖 حفظ جديد</p>
+              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>حفظ جديد</p>
               {latestMem && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestMem.ayahCount} آية</span>}
             </div>
             <div className="p-3">
@@ -1689,7 +1686,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           {/* مراجعة صغرى — لون موحد نفس النظام */}
           <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmall ? "#1F5E3A" : "#E1E5DA"}}>
             <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmall ? "#1F5E3A" : "#F3F4F6"}}>
-              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>🔁 مراجعة صغرى</p>
+              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>مراجعة صغرى</p>
               {latestSmall && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmall.ayahCount} آية</span>}
             </div>
             <div className="p-3">
@@ -1716,7 +1713,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           {/* مراجعة كبرى — لون موحد نفس النظام */}
           <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarge ? "#1F5E3A" : "#E1E5DA"}}>
             <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarge ? "#1F5E3A" : "#F3F4F6"}}>
-              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>📚 مراجعة كبرى</p>
+              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>مراجعة كبرى</p>
               {latestLarge && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarge.ayahCount} آية</span>}
             </div>
             <div className="p-3">
