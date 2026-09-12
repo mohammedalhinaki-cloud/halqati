@@ -638,8 +638,44 @@ export default function App() {
 
   // ============ UI ============
   if (!currentUser) {
-    // GUEST / LOGIN VIEW (also supports ?t parent view -> but require login? We'll allow parent view without login if student detail open)
-    // If parent token view is open, show only student card? but we keep login behind
+    // === مسار ولي الأمر عبر ?t= — عرض مباشر بدون تسجيل (حذف نهائي لعناصر الكرت الأبيض من هذا المسار أيضاً) ===
+    const _parentParams = new URLSearchParams(window.location.search)
+    const _parentToken = _parentParams.get("t")
+    let _parentStudent: Student | null = null
+    if (_parentToken) {
+      _parentStudent = students.find(x => x.accessToken === _parentToken) || null
+      if (!_parentStudent) {
+        try {
+          const _raw: any[] = JSON.parse(localStorage.getItem("halqati_students") || "[]")
+          _parentStudent = _raw.find((x: any) => x.accessToken === _parentToken) as Student || null
+        } catch {}
+      }
+    }
+    if (_parentToken && _parentStudent) {
+      return (
+        <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+          <ParentTokenView student={_parentStudent} circles={circles} staff={staff} attendance={attendance} plan={plan} />
+          <Footer />
+          {toast && <Toast msg={toast} />}
+        </div>
+      )
+    }
+    if (_parentToken && !_parentStudent) {
+      return (
+        <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+            <div className="bg-white rounded-2xl border border-amber-200 p-6 text-center max-w-sm shadow-sm">
+              <p className="text-2xl mb-2">🔗</p>
+              <p className="font-bold text-sm" style={{color:"#163F27"}}>رابط المتابعة غير صالح أو منتهي</p>
+              <p className="text-xs text-gray-500 mt-1 leading-5">تأكد من نسخ الرابط كاملاً من المعلم أو تواصل معه للحصول على رابط جديد.</p>
+              <a href={window.location.pathname} className="inline-block mt-4 px-5 py-2 rounded-xl bg-[#1F5E3A] text-white text-xs font-bold">الذهاب للصفحة الرئيسية</a>
+            </div>
+          </div>
+          <Footer />
+        </div>
+      )
+    }
+    // تسجيل الدخول العادي — الكرت الأبيض بدون أزرار/نصوص محذوفة
     return (
       <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
@@ -1419,6 +1455,132 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
           <span className="text-[11px] text-gray-500">يُحفظ تلقائياً في المتصفح {getSupabaseConfig().isConfigured && "و Supabase"}</span>
           <button onClick={() => { onClose(); onToast("تم حفظ الخطة السنوية") }} className="px-5 py-2 rounded-xl bg-[#1F5E3A] text-white font-bold text-sm">إغلاق وحفظ</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ParentTokenView({ student, circles, staff, attendance, plan }: { student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; plan: AcademicPlan }) {
+  const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
+  const totalAyah = student.memorizationLog.reduce((a,b)=>a+b.ayahCount,0)
+  const totalReview = student.reviewLog.reduce((a,b)=>a+b.ayahCount,0)
+  const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x=>x.grade==="ممتاز").length / student.memorizationLog.length * 100) : 0
+  return (
+    <div className="flex-1">
+      {/* Header مبسط لولي الأمر */}
+      <div className="bg-white border-b border-[#E1E5DA] sticky top-0 z-20">
+        <div className="max-w-[900px] mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{background:"#E7EFE7"}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 4-13 13-15C17.5 13 13 17.5 5 19Z" stroke="#1F5E3A" strokeWidth="1.5" strokeLinejoin="round"/><path d="M6.5 17.2C9 12.5 12.2 9 17.3 6" stroke="#1F5E3A" strokeWidth="1.2" strokeLinecap="round"/></svg>
+            </div>
+            <div>
+              <h2 className="font-black text-[15px]" style={{color:"#163F27"}}>حلقتي — متابعة ولي الأمر</h2>
+              <p className="text-[11px]" style={{color:"#5B6459"}}>عرض فقط بدون تسجيل دخول</p>
+            </div>
+          </div>
+          <a href={window.location.pathname} className="px-3 py-1.5 rounded-full bg-[#FAF9F4] border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A]">الرئيسية</a>
+        </div>
+      </div>
+      <div className="max-w-[900px] mx-auto px-4 py-6 space-y-4">
+        <div className="bg-white rounded-2xl border p-5 flex items-center gap-4 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0" style={{background:"#1F5E3A"}}>{student.name.trim().charAt(0)}</div>
+          <div>
+            <h3 className="font-black text-lg" style={{color:"#163F27"}}>{student.name}</h3>
+            <p className="text-xs text-gray-500 mt-1">{circleName} • حفظ: {student.memorizationLog.length} • مراجعة: {student.reviewLog.length} • أخطاء: {student.errorsLog.length}</p>
+            <p className="text-[11px] text-emerald-700 mt-0.5">✓ هذا العرض للمتابعة فقط — لا يمكن التعديل من هذا الرابط</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <MiniStat label="مقدار الحفظ" value={totalAyah + " آية"} />
+          <MiniStat label="مقدار المراجعة" value={totalReview + " آية"} />
+          <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
+          <MiniStat label="عدد الملاحظات" value={String(student.notes.length)} />
+        </div>
+        <div className="bg-white rounded-2xl border p-4">
+          <h4 className="font-bold text-xs mb-3">سجل الحفظ ({student.memorizationLog.length})</h4>
+          {student.memorizationLog.length===0 ? <p className="text-xs text-gray-400 text-center py-6">لا يوجد سجل حفظ بعد</p> : (
+            <div className="space-y-2 max-h-[320px] overflow-auto pr-1">
+              {student.memorizationLog.map(e=> (
+                <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4]/50">
+                  <div>
+                    <p className="font-bold text-xs">سورة {e.surahName} — من الآية {e.fromAyah} إلى {e.toAyah} <span className="text-gray-400">({e.ayahCount} آية)</span></p>
+                    <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • المعلم: {staff.find(s=>s.id===e.teacherId)?.name || "—"}</p>
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl border p-4">
+            <h4 className="font-bold text-xs mb-3">مراجعة صغرى ({student.reviewLog.filter(x=>x.reviewType==="small").length})</h4>
+            {student.reviewLog.filter(x=>x.reviewType==="small").length===0 ? <p className="text-xs text-gray-400 text-center py-4">لا توجد مراجعات صغرى</p> : (
+              <div className="space-y-2 max-h-[260px] overflow-auto pr-1">
+                {student.reviewLog.filter(x=>x.reviewType==="small").map(e=> (
+                  <div key={e.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-white">
+                    <div><p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({e.ayahCount} آية)</p><p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • {staff.find(s=>s.id===e.teacherId)?.name || "—"}</p></div>
+                    <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="bg-white rounded-2xl border p-4">
+            <h4 className="font-bold text-xs mb-3">مراجعة كبرى ({student.reviewLog.filter(x=>x.reviewType==="large").length})</h4>
+            {student.reviewLog.filter(x=>x.reviewType==="large").length===0 ? <p className="text-xs text-gray-400 text-center py-4">لا توجد مراجعات كبرى</p> : (
+              <div className="space-y-2 max-h-[260px] overflow-auto pr-1">
+                {student.reviewLog.filter(x=>x.reviewType==="large").map(e=> (
+                  <div key={e.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-white">
+                    <div><p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({e.ayahCount} آية)</p><p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • {staff.find(s=>s.id===e.teacherId)?.name || "—"}</p></div>
+                    <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl border p-4">
+          <h4 className="font-bold text-xs mb-3">الأخطاء ({student.errorsLog.length})</h4>
+          {student.errorsLog.length===0 ? <p className="text-xs text-emerald-700 text-center py-2 bg-emerald-50 border border-emerald-200 rounded-xl">لا يوجد أخطاء مسجلة، ما شاء الله!</p> : (
+            <div className="space-y-2">
+              {student.errorsLog.map(e=> (
+                <div key={e.id} className="p-3 rounded-xl border bg-red-50/50 border-red-200">
+                  <p className="font-bold text-xs text-red-800">{e.type} — <span className="font-normal text-gray-700">{e.description}</span></p>
+                  <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="bg-white rounded-2xl border p-4">
+          <h4 className="font-bold text-xs mb-3">الملاحظات ({student.notes.length})</h4>
+          {student.notes.length===0 ? <p className="text-xs text-gray-400 text-center py-2">لا توجد ملاحظات</p> : (
+            <div className="space-y-2">
+              {student.notes.map(n=> (
+                <div key={n.id} className="p-3 rounded-xl border bg-amber-50/50 border-amber-200">
+                  <p className="text-xs leading-5">{n.text}</p>
+                  <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(n.date)} • {staff.find(s=>s.id===n.authorId)?.name || "—"}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="bg-white rounded-2xl border p-4">
+          <h4 className="font-bold text-xs mb-3">سجل التحضير</h4>
+          {(() => {
+            const h = attendance.filter(a=>a.studentId===student.id).sort((a,b)=> b.date.localeCompare(a.date))
+            if(h.length===0) return <p className="text-xs text-gray-400 text-center py-4">لا يوجد سجل تحضير بعد</p>
+            return <div className="space-y-1.5 max-h-[240px] overflow-auto pr-1">{h.slice(0,20).map(r=> (<div key={r.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-[#FAF9F4]"><p className="font-bold text-xs">{fmtBoth(r.date)}</p><span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[r.status]}`}>{r.status}</span></div>))}</div>
+          })()}
+        </div>
+        <div className="bg-[#163F27] text-white rounded-2xl p-4">
+          <h4 className="font-bold text-xs mb-2">الخطة السنوية</h4>
+          <p className="text-xs opacity-80">السنة: {plan.startDate ? `${fmtBoth(plan.startDate)} إلى ${fmtBoth(plan.endDate)}` : "غير محددة"}</p>
+          <p className="text-xs opacity-80 mt-1">أيام التسميع: {plan.activeWeekdays.map(i=> WEEKDAYS[i]).join("، ") || "—"}</p>
+        </div>
+        <p className="text-center text-[11px] text-gray-400">تم إنشاء هذا الرابط من نظام حلقتي • للاستفسار: ‎+966507804528</p>
       </div>
     </div>
   )
