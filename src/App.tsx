@@ -174,6 +174,15 @@ const toHijri = (iso: string) => {
     return new Date(iso + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-islamic-umalqura", { year: 'numeric', month: 'long', day: 'numeric' })
   } catch { return iso }
 }
+const fmtBoth = (iso: string) => {
+  try {
+    const h = toHijri(iso)
+    const m = fmtDate(iso)
+    const hijri = h.includes("هـ") ? h : `${h}هـ`
+    const greg = m.includes("م") ? m : `${m}م`
+    return `${hijri} — ${greg}`
+  } catch { return iso }
+}
 const tokenForStudent = (s: Student) => s.accessToken
 const linkForStudent = (s: Student) => {
   const base = window.location.origin + window.location.pathname
@@ -564,7 +573,7 @@ export default function App() {
   }
   const bulkAttendance = (status:AttendanceStatus) => {
     visibleStudents.forEach(s=> setAttendanceStatus(s.id, status))
-    showToast(`تم تسجيل ${status} للجميع في ${fmtDate(attendanceDate)}`)
+    showToast(`تم تسجيل ${status} للجميع في ${fmtBoth(attendanceDate)}`)
   }
   const attendanceStatsForDate = (()=>{
     const list = attendance.filter(a=>a.date===attendanceDate)
@@ -746,7 +755,7 @@ export default function App() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📋 تحضير الحلقة</h2>
-                <p className="text-[11px] text-gray-400 mt-1">{fmtDate(attendanceDate)} • {toHijri(attendanceDate)}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{fmtBoth(attendanceDate)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)} className="px-4 py-2.5 rounded-xl border border-[#E1E5DA] text-sm bg-white shadow-sm focus:ring-2 focus:ring-[#1F5E3A] outline-none" />
@@ -834,7 +843,7 @@ export default function App() {
                 })}
             </div>
           </div>
-          <p className="text-center text-[11px] text-gray-400 mt-4">💡 التحضير يُحفظ تلقائياً • يمكنك تعديل أي حالة في أي وقت بالضغط عليها • التاريخ الهجري: {toHijri(attendanceDate)}</p>
+          <p className="text-center text-[11px] text-gray-400 mt-4">💡 التحضير يُحفظ تلقائياً • يمكنك تعديل أي حالة في أي وقت بالضغط عليها • التاريخ: {fmtBoth(attendanceDate)}</p>
         </main>
       ) : (
       <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-5">
@@ -927,7 +936,7 @@ export default function App() {
           <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden mb-6">
             <div className="px-4 py-3 border-b border-[#E1E5DA] bg-[#FAF9F4]/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
-                <h3 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>📋 نظام التحضير اليومي <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{fmtDate(attendanceDate)} • {toHijri(attendanceDate)}</span></h3>
+                <h3 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>📋 نظام التحضير اليومي <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{fmtBoth(attendanceDate)}</span></h3>
                 <p className="text-[11px] text-gray-500 mt-0.5">تسجيل حضور وغياب الطلاب — يظهر فقط للمالك والمدير والمشرف</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -953,7 +962,7 @@ export default function App() {
               {ATTENDANCE_STATUS.map(st=> (
                 <button key={st} onClick={()=> bulkAttendance(st)} className="px-3 py-1.5 rounded-full text-xs font-bold border hover:opacity-90 transition" style={{background: ATTENDANCE_COLOR[st], color:"white"}}>{st} للجميع</button>
               ))}
-              <button onClick={()=>{ if(confirm("حذف تحضير هذا اليوم؟")){ setAttendance(prev=> prev.filter(a=> a.date!==attendanceDate)); const sb=getSupabase(); if(sb) sb.from("halqati_attendance").delete().eq("date", attendanceDate).then(); showToast("تم حذف تحضير "+fmtDate(attendanceDate)) } }} className="mr-auto px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold">🗑️ حذف تحضير اليوم</button>
+              <button onClick={()=>{ if(confirm("حذف تحضير هذا اليوم؟")){ setAttendance(prev=> prev.filter(a=> a.date!==attendanceDate)); const sb=getSupabase(); if(sb) sb.from("halqati_attendance").delete().eq("date", attendanceDate).then(); showToast("تم حذف تحضير "+fmtBoth(attendanceDate)) } }} className="mr-auto px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold">🗑️ حذف تحضير اليوم</button>
             </div>
             {/* List */}
             <div className="p-3 space-y-2 max-h-[420px] overflow-auto">
@@ -984,7 +993,7 @@ export default function App() {
                 })
               }
             </div>
-            <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 text-[11px] text-amber-800 text-center">💡 التحضير يُحفظ تلقائياً في المتصفح و Supabase (إذا كان الربط مفعّلاً من قبل المالك) • التاريخ الهجري: {toHijri(attendanceDate)}</div>
+            <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 text-[11px] text-amber-800 text-center">💡 التحضير يُحفظ تلقائياً في المتصفح و Supabase (إذا كان الربط مفعّلاً من قبل المالك) • التاريخ: {fmtBoth(attendanceDate)}</div>
           </div>
         )}
 
@@ -1364,8 +1373,8 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
             <h4 className="font-bold text-sm mb-2">السنة الدراسية</h4>
             <p className="text-xs text-gray-500 mb-3">نطاق السنة الدراسية بالتقويم الهجري — يُعرض التاريخ الهجري للمراجعة</p>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-xs font-bold">تاريخ البداية</label><input type="date" value={plan.startDate} onChange={e => setPlan({ ...plan, startDate: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><p className="text-[11px] text-gray-500 mt-1">{toHijri(plan.startDate)}</p></div>
-              <div><label className="text-xs font-bold">تاريخ النهاية</label><input type="date" value={plan.endDate} onChange={e => setPlan({ ...plan, endDate: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><p className="text-[11px] text-gray-500 mt-1">{toHijri(plan.endDate)}</p></div>
+              <div><label className="text-xs font-bold">تاريخ البداية</label><input type="date" value={plan.startDate} onChange={e => setPlan({ ...plan, startDate: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><p className="text-[11px] text-gray-500 mt-1">{fmtBoth(plan.startDate)}</p></div>
+              <div><label className="text-xs font-bold">تاريخ النهاية</label><input type="date" value={plan.endDate} onChange={e => setPlan({ ...plan, endDate: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><p className="text-[11px] text-gray-500 mt-1">{fmtBoth(plan.endDate)}</p></div>
             </div>
           </div>
 
@@ -1398,7 +1407,7 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
                   <div key={h.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-[#FAF9F4]">
                     <div>
                       <p className="font-bold text-xs">{h.name}</p>
-                      <p className="text-[11px] text-gray-500">{fmtDate(h.startDate)} — {fmtDate(h.endDate)} • {toHijri(h.startDate)} إلى {toHijri(h.endDate)}</p>
+                      <p className="text-[11px] text-gray-500">{fmtBoth(h.startDate)} إلى {fmtBoth(h.endDate)}</p>
                     </div>
                     <button onClick={() => setPlan(p => ({ ...p, holidays: p.holidays.filter(x => x.id !== h.id) }))} className="px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs">حذف</button>
                   </div>
@@ -1460,7 +1469,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             <a href={student.phone ? waLink : waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 rounded-xl bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-bold">📱 واتساب لولي الأمر</a>
             <a href={waGeneral} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl bg-white border text-xs font-bold">مشاركة عامة</a>
           </div>
-          <p className="text-[11px] text-gray-500 mt-2">آخر زيارة: {student.visitLog[0]?.date ? fmtDate(student.visitLog[0].date) + ` (${student.visitLog.length} زيارة)` : "لم يزر بعد"} • مجموع الزيارات: {student.visitLog.reduce((a, b) => a + b.count, 0)}</p>
+          <p className="text-[11px] text-gray-500 mt-2">آخر زيارة: {student.visitLog[0]?.date ? fmtBoth(student.visitLog[0].date) + ` (${student.visitLog.length} زيارة)` : "لم يزر بعد"} • مجموع الزيارات: {student.visitLog.reduce((a, b) => a + b.count, 0)}</p>
         </div>
 
         {/* Stats */}
@@ -1478,7 +1487,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
               <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-gray-50">
                 <div>
                   <p className="font-bold text-xs">سورة {e.surahName} — من الآية {e.fromAyah} إلى {e.toAyah} <span className="text-gray-400">({e.ayahCount} آية)</span></p>
-                  <p className="text-[11px] text-gray-500">{fmtDate(e.date)} • {toHijri(e.date)} • المعلم: {staff.find(s => s.id === e.teacherId)?.name || "—"}</p>
+                  <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • المعلم: {staff.find(s => s.id === e.teacherId)?.name || "—"}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[e.grade] }}>{e.grade}</span>
@@ -1536,7 +1545,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
               <div key={e.id} className="p-3 rounded-xl border bg-red-50/50 border-red-200 flex items-center justify-between">
                 <div>
                   <p className="font-bold text-xs text-red-800">{e.type} — <span className="font-normal text-gray-700">{e.description}</span></p>
-                  <p className="text-[11px] text-gray-500">{fmtDate(e.date)}</p>
+                  <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                 </div>
                 <button onClick={() => onUpdate({ ...student, errorsLog: student.errorsLog.filter(x => x.id !== e.id) })} className="px-2 py-1 rounded-full bg-white border text-xs">حذف</button>
               </div>
@@ -1551,7 +1560,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             {student.notes.map(n => (
               <div key={n.id} className="p-3 rounded-xl border bg-amber-50/50 border-amber-200">
                 <p className="text-xs leading-5">{n.text}</p>
-                <p className="text-[11px] text-gray-500 mt-1">{fmtDate(n.date)} • {staff.find(s => s.id === n.authorId)?.name || "—"}</p>
+                <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(n.date)} • {staff.find(s => s.id === n.authorId)?.name || "—"}</p>
               </div>
             ))}
             {student.notes.length === 0 && <p className="text-xs text-gray-400 text-center py-2">لا توجد ملاحظات</p>}
@@ -1603,7 +1612,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                   {history.slice(0,20).map(h=> (
                     <div key={h.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-[#FAF9F4]">
                       <div>
-                        <p className="font-bold text-xs">{fmtDate(h.date)} • <span className="font-normal text-gray-500">{toHijri(h.date)}</span></p>
+                        <p className="font-bold text-xs">{fmtBoth(h.date)}</p>
                         <p className="text-[11px] text-gray-500">بواسطة: {staff.find(s=>s.id===h.recordedBy)?.name || "—"} {h.note ? `• ${h.note}` : ""}</p>
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[h.status]}`}>{h.status}</span>
@@ -1618,7 +1627,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
         {/* Plan summary */}
         <div className="bg-[#163F27] text-white rounded-2xl p-4">
           <h4 className="font-bold text-xs mb-2">الخطة السنوية</h4>
-          <p className="text-xs opacity-80">السنة: {plan.startDate ? `${toHijri(plan.startDate)} إلى ${toHijri(plan.endDate)}` : "غير محددة"}</p>
+          <p className="text-xs opacity-80">السنة: {plan.startDate ? `${fmtBoth(plan.startDate)} إلى ${fmtBoth(plan.endDate)}` : "غير محددة"}</p>
           <p className="text-xs opacity-80 mt-1">أيام التسميع: {plan.activeWeekdays.map(i => WEEKDAYS[i]).join("، ") || "—"}</p>
           <p className="text-xs opacity-80 mt-1">الإجازات: {plan.holidays.length ? plan.holidays.map(h => h.name).join("، ") : "لا توجد إجازات"}</p>
         </div>
@@ -1648,7 +1657,7 @@ function LogRow({ e, staff, onDelete }: { e: ReviewEntry; staff: Staff[]; onDele
     <div className="flex items-center justify-between p-2.5 rounded-xl border bg-white">
       <div>
         <p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({e.ayahCount} آية)</p>
-        <p className="text-[11px] text-gray-500">{fmtDate(e.date)} • {staff.find(s => s.id === e.teacherId)?.name || "—"}</p>
+        <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • {staff.find(s => s.id === e.teacherId)?.name || "—"}</p>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[e.grade] }}>{e.grade}</span>
