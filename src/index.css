@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+* { font-family: "Tajawal", system-ui, -apple-system, sans-serif; }
+body { background:#FAF9F4; }
