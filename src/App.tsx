@@ -1513,7 +1513,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           <div>
             <h3 className="font-black text-lg" style={{color:"#163F27"}}>{student.name}</h3>
             <p className="text-xs text-gray-500 mt-1">{circleName} • حفظ: {student.memorizationLog.length} • مراجعة: {student.reviewLog.length} • أخطاء: {student.errorsLog.length}</p>
-            <p className="text-[11px] text-emerald-700 mt-0.5">✓ هذا العرض للمتابعة فقط — لا يمكن التعديل من هذا الرابط</p>
+            
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -1605,7 +1605,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           <p className="text-xs opacity-80">السنة: {plan.startDate ? `${fmtBoth(plan.startDate)} إلى ${fmtBoth(plan.endDate)}` : "غير محددة"}</p>
           <p className="text-xs opacity-80 mt-1">أيام التسميع: {plan.activeWeekdays.map(i=> WEEKDAYS[i]).join("، ") || "—"}</p>
         </div>
-        <p className="text-center text-[11px] text-gray-400">تم إنشاء هذا الرابط من نظام حلقتي • للاستفسار: ‎+966507804528</p>
+        
       </div>
     </div>
   )
