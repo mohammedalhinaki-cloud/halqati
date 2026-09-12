@@ -1790,7 +1790,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>📖</span>
                           <div>
                             <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
-                            <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • المعلم: {staff.find(s=>s.id===e.teacherId)?.name || "—"}</p>
+                            <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
                         <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white shrink-0" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
@@ -1806,7 +1806,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>{isSmall ? "🔁" : "📚"}</span>
                           <div>
                             <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
-                            <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • {staff.find(s=>s.id===e.teacherId)?.name || "—"}</p>
+                            <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
                         <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white shrink-0" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
