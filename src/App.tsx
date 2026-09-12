@@ -190,6 +190,7 @@ export default function App() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [attendanceDate, setAttendanceDate] = useState<string>(todayISO())
   const [attendanceNote, setAttendanceNote] = useState<Record<string,string>>({})
+  const [supervisorCircle, setSupervisorCircle] = useState<string>("all")
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => localStorage.getItem("halqati_session"))
   const [toast, setToast] = useState<string | null>(null)
   const [search, setSearch] = useState("")
@@ -297,9 +298,37 @@ export default function App() {
 
   const currentUser = useMemo(() => staff.find(x => x.id === currentUserId) || null, [staff, currentUserId])
   const isOwner = currentUser?.role === "owner"
-  const isOwnerOrAdmin = currentUser && ["owner", "admin", "supervisor"].includes(currentUser.role)
+  const isOwnerOrAdmin = currentUser && ["owner", "admin"].includes(currentUser.role)
   const canRecordAttendance = currentUser && ["owner", "admin", "supervisor"].includes(currentUser.role)
   const hasOwner = staff.some(s => s.role === "owner")
+
+  // ===== Supervisor dedicated view helpers =====
+  const supervisorStudents = useMemo(() => {
+    if (currentUser?.role !== "supervisor") return []
+    let list = students
+    if (supervisorCircle !== "all") list = list.filter(s => s.circleId === supervisorCircle)
+    return list
+  }, [students, supervisorCircle, currentUser])
+  const supervisorStats = useMemo(() => {
+    const list = attendance.filter(a => a.date === attendanceDate && supervisorStudents.some(s => s.id === a.studentId))
+    return {
+      حاضر: list.filter(a => a.status === "حاضر").length,
+      غائب: list.filter(a => a.status === "غائب").length,
+      متأخر: list.filter(a => a.status === "متأخر").length,
+      "غائب بعذر": list.filter(a => a.status === "غائب بعذر").length,
+      total: list.length
+    }
+  }, [attendance, attendanceDate, supervisorStudents])
+
+  // Auto-select supervisor circle if assigned
+  useEffect(() => {
+    if (currentUser?.role === "supervisor" && supervisorCircle === "all" && currentUser.circleId) {
+      setSupervisorCircle(currentUser.circleId)
+    } else if (currentUser?.role === "supervisor" && supervisorCircle === "all" && circles.length === 1) {
+      setSupervisorCircle(circles[0].id)
+    }
+  }, [currentUser, circles])
+
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2800) }
 
@@ -702,13 +731,113 @@ export default function App() {
             </span>}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>
+            {currentUser?.role !== "supervisor" && <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
             {isOwner && <button onClick={() => setSupabaseModal(true)} className="px-3 py-1.5 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-gray-50">⚙️ Supabase</button>}
             <button onClick={() => { setCurrentUserId(null); showToast("تم تسجيل الخروج") }} className="px-3 py-1.5 rounded-full bg-[#B3492C] hover:bg-[#963d25] text-white text-xs font-bold">خروج</button>
           </div>
         </div>
       </header>
 
+      {currentUser.role === "supervisor" ? (
+        /* ===== Supervisor dedicated attendance view - بسيطة ومخصصة للتحضير فقط ===== */
+        <main className="flex-1 max-w-[900px] w-full mx-auto px-4 py-6">
+          {/* Welcome Card */}
+          <div className="bg-white rounded-2xl border border-[#E1E5DA] p-5 mb-5 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📋 تحضير الحلقة</h2>
+                <p className="text-xs text-gray-500 mt-1">مرحباً {currentUser.name} — مهمتك تسجيل حضور طلاب حلقتك</p>
+                <p className="text-[11px] text-gray-400 mt-1">{fmtDate(attendanceDate)} • {toHijri(attendanceDate)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)} className="px-4 py-2.5 rounded-xl border border-[#E1E5DA] text-sm bg-white shadow-sm focus:ring-2 focus:ring-[#1F5E3A] outline-none" />
+              </div>
+            </div>
+            {circles.length > 1 && (
+              <div className="mt-4 pt-4 border-t">
+                <label className="text-xs font-bold text-gray-700 mb-1 block">اختر الحلقة</label>
+                <select value={supervisorCircle} onChange={e=>setSupervisorCircle(e.target.value)} className="w-full md:w-[360px] px-4 py-2.5 rounded-xl border border-[#E1E5DA] text-sm bg-white">
+                  <option value="all">كل الحلقات ({students.length} طالب)</option>
+                  {circles.map(c=> {
+                    const cnt = students.filter(s=>s.circleId===c.id).length
+                    return <option key={c.id} value={c.id}>{c.name} ({cnt} طلاب)</option>
+                  })}
+                </select>
+              </div>
+            )}
+            {circles.length === 1 && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm font-bold" style={{color:"#1F5E3A"}}>الحلقة: {circles[0].name} • {students.filter(s=>s.circleId===circles[0].id).length} طلاب</p>
+              </div>
+            )}
+            {circles.length === 0 && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">⚠️ لا توجد حلقات مسجلة بعد — تواصل مع الإدارة</p>
+              </div>
+            )}
+          </div>
+
+          {/* Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            {ATTENDANCE_STATUS.map(st=> (
+              <div key={st} className="bg-white rounded-2xl p-4 border shadow-sm text-center">
+                <p className="text-[11px] font-bold text-gray-500">{st}</p>
+                <p className="font-black text-2xl mt-1" style={{color:ATTENDANCE_COLOR[st]}}>{(supervisorStats as any)[st]}</p>
+                <p className="text-[11px] text-gray-400 mt-1">طالب</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4 flex items-center justify-between text-xs">
+            <span className="font-bold text-emerald-800">الإجمالي المسجل: {supervisorStats.total} / {supervisorStudents.length}</span>
+            <span className="text-emerald-700 font-bold">{supervisorStats.total===supervisorStudents.length && supervisorStudents.length>0 ? "✓ مكتمل" : `متبقي ${supervisorStudents.length - supervisorStats.total}`}</span>
+          </div>
+
+          {/* Quick bulk */}
+          <div className="flex gap-2 mb-4 flex-wrap items-center bg-white rounded-xl p-3 border shadow-sm">
+            <span className="text-xs font-bold text-gray-600">تسجيل سريع:</span>
+            {ATTENDANCE_STATUS.map(st=> (
+              <button key={st} onClick={()=> { supervisorStudents.forEach(s=> setAttendanceStatus(s.id, st)); showToast(`تم تسجيل ${st} للجميع`)}} className="px-4 py-2 rounded-full text-xs font-bold text-white shadow-sm hover:opacity-90 transition" style={{background:ATTENDANCE_COLOR[st]}}>{st} للجميع</button>
+            ))}
+          </div>
+
+          {/* Students List */}
+          <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b bg-[#FAF9F4]/60 flex items-center justify-between">
+              <h3 className="font-bold text-sm" style={{color:"#163F27"}}>قائمة الطلاب ({supervisorStudents.length})</h3>
+              <span className="text-[11px] text-gray-500">اضغط على الحالة لتعديلها</span>
+            </div>
+            <div className="p-3 space-y-2 max-h-[520px] overflow-auto">
+              {supervisorStudents.length===0 ? (
+                <div className="text-center py-12">
+                  <p className="text-3xl mb-2">👥</p>
+                  <p className="text-sm text-gray-400">لا يوجد طلاب في هذه الحلقة</p>
+                </div>
+              ) : supervisorStudents.map(s=>{
+                  const rec = getAttendanceFor(s.id, attendanceDate)
+                  const circleName2 = circles.find(c=>c.id===s.circleId)?.name || "بدون حلقة"
+                  return (
+                    <div key={s.id} className="flex flex-col gap-2 p-3 rounded-2xl border hover:bg-[#FAF9F4]/60 transition bg-white">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm shrink-0" style={{background: rec ? ATTENDANCE_COLOR[rec.status] : "#E7EFE7", color: rec ? "white":"#1F5E3A"}}>{s.name.trim().charAt(0)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-[13px] truncate" style={{color:"#20281F"}}>{s.name} <span className="text-[11px] text-gray-400 font-normal">• {circleName2}</span></p>
+                          {rec && <p className="text-[11px] text-gray-500">الحالة الحالية: <span className="font-bold" style={{color:ATTENDANCE_COLOR[rec.status]}}>{rec.status}</span></p>}
+                        </div>
+                        {rec ? <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${ATTENDANCE_BG[rec.status]}`}>{rec.status}</span> : <span className="px-2.5 py-1 rounded-full text-[11px] font-bold border bg-gray-50 text-gray-500 shrink-0">لم يُحضّر</span>}
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {ATTENDANCE_STATUS.map(st=> (
+                          <button key={st} onClick={()=> setAttendanceStatus(s.id, st)} className={`py-2 rounded-xl text-[11px] font-bold border transition ${rec?.status===st ? "text-white shadow-sm" : "bg-white hover:bg-gray-50 text-gray-700"}`} style={rec?.status===st ? {background: ATTENDANCE_COLOR[st], borderColor: ATTENDANCE_COLOR[st]} : {}}>{st}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+          <p className="text-center text-[11px] text-gray-400 mt-4">💡 التحضير يُحفظ تلقائياً • يمكنك تعديل أي حالة في أي وقت بالضغط عليها • التاريخ الهجري: {toHijri(attendanceDate)}</p>
+        </main>
+      ) : (
       <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-5">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -915,11 +1044,12 @@ export default function App() {
           </div>
         )}
       </main>
+      )}
 
       <Footer />
 
       {/* Student Detail Drawer */}
-      {selectedStudent && (
+      {selectedStudent && currentUser?.role !== "supervisor" && (
         <div className="fixed inset-0 z-40 flex">
           <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedStudentId(null)} />
           <div className="w-full max-w-[780px] bg-[#FAF9F4] h-full overflow-auto shadow-2xl border-l border-[#E1E5DA]">
@@ -1067,7 +1197,7 @@ export default function App() {
         </Modal>
       )}
 
-      {planModal && (
+      {planModal && currentUser?.role !== "supervisor" && (
         <PlanModal plan={plan} setPlan={setPlan} onClose={() => setPlanModal(false)} onToast={showToast} />
       )}
 
