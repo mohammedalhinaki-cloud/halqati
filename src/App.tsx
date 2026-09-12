@@ -845,8 +845,8 @@ export default function App() {
             </span>}
           </div>
           <div className="flex items-center gap-2">
-            {isOwnerOrAdmin && <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
-            {currentUser?.role === "teacher" && <button onClick={() => setShowTeacherPlan(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
+            {isOwner && <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
+            {(currentUser?.role === "admin" || currentUser?.role === "teacher") && <button onClick={() => setShowTeacherPlan(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
             {isOwner && <button onClick={() => setSupabaseModal(true)} className="px-3 py-1.5 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-gray-50">⚙️ Supabase</button>}
             <button onClick={() => { setCurrentUserId(null); showToast("تم تسجيل الخروج") }} className="px-3 py-1.5 rounded-full bg-[#B3492C] hover:bg-[#963d25] text-white text-xs font-bold">خروج</button>
           </div>
@@ -956,7 +956,7 @@ export default function App() {
         </main>
       ) : (
       <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-5">
-        {currentUser?.role === "teacher" && showTeacherPlan ? (
+        {(currentUser?.role === "teacher" || currentUser?.role === "admin") && showTeacherPlan ? (
           <div className="space-y-4">
             <button onClick={()=> setShowTeacherPlan(false)} className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-[#FAF9F4] transition">
               <span>→</span> رجوع للوحة التحكم
@@ -1115,17 +1115,17 @@ export default function App() {
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
             {isOwnerOrAdmin && <button onClick={() => setShowAnnouncementModal(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📢 إضافة إعلان</button>}
-            {isOwnerOrAdmin ? (
+            {isOwner ? (
               <button onClick={() => setPlanModal(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📅 الخطة</button>
-            ) : currentUser?.role === "teacher" ? (
+            ) : (currentUser?.role === "admin" || currentUser?.role === "teacher") ? (
               <button onClick={() => setShowTeacherPlan(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📅 الخطة</button>
             ) : null}
             <button onClick={() => { setStudentForm({ name: "", phone: "", circleId: filterCircle !== "all" ? filterCircle : "" }); setEditingStudentId(null); setShowStudentModal(true) }} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">+ إضافة طالب</button>
           </div>
         </div>
 
-        {/* Management tabs */}
-        {isOwnerOrAdmin && (
+        {/* Management tabs - فقط للمالك (مخفي عن المدير حسب الطلب) */}
+        {isOwner && (
           <div className="grid md:grid-cols-2 gap-4 mb-6">
             {/* Circles */}
             <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden">
@@ -1447,7 +1447,7 @@ export default function App() {
         </Modal>
       )}
 
-      {planModal && isOwnerOrAdmin && (
+      {planModal && isOwner && (
         <PlanModal plan={plan} setPlan={setPlan} onClose={() => setPlanModal(false)} onToast={showToast} />
       )}
       {showAnnouncementModal && isOwnerOrAdmin && (
