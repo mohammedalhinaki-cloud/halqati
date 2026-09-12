@@ -1100,26 +1100,27 @@ export default function App() {
           </div>
         )}
 
-        {/* Toolbar */}
-        <div className="bg-white rounded-2xl border border-[#E1E5DA] p-3 mb-5 shadow-sm">
-          <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
-            <div className="flex flex-1 gap-2">
-              <div className="relative flex-1">
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الجوال..." className="w-full pr-9 pl-3 py-2 rounded-xl border border-[#E1E5DA] text-sm focus:outline-none focus:ring-2 focus:ring-[#1F5E3A]" />
-                <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
-              </div>
-              <select value={filterCircle} onChange={e => setFilterCircle(e.target.value)} className="px-3 py-2 rounded-xl border border-[#E1E5DA] text-sm bg-white min-w-[160px]">
-                <option value="all">كل الحلقات</option>
-                {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                <option value="">بدون حلقة</option>
-              </select>
+        {/* Toolbar - أزرار متناسقة تغطي المستطيل الأبيض */}
+        <div className="bg-white rounded-2xl border border-[#E1E5DA] p-4 mb-5 shadow-sm space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <select value={filterCircle} onChange={e => setFilterCircle(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-[#E1E5DA] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F5E3A]">
+              <option value="all">كل الحلقات</option>
+              {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="">بدون حلقة</option>
+            </select>
+            <div className="relative">
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الجوال..." className="w-full pr-10 pl-4 py-3 rounded-xl border border-[#E1E5DA] text-sm focus:outline-none focus:ring-2 focus:ring-[#1F5E3A]" />
+              <span className="absolute right-3 top-3 text-gray-400">🔍</span>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {isOwnerOrAdmin && <button onClick={() => setPlanModal(true)} className="lg:hidden px-3 py-2 rounded-xl bg-[#E7EFE7] text-[#1F5E3A] text-xs font-bold border">📅 الخطة</button>}
-              {currentUser?.role === "teacher" && <button onClick={() => setShowTeacherPlan(true)} className="lg:hidden px-3 py-2 rounded-xl bg-[#E7EFE7] text-[#1F5E3A] text-xs font-bold border">📅 الخطة</button>}
-              {isOwnerOrAdmin && <button onClick={() => setShowAnnouncementModal(true)} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold">📢 إضافة إعلان</button>}
-              <button onClick={() => { setStudentForm({ name: "", phone: "", circleId: filterCircle !== "all" ? filterCircle : "" }); setEditingStudentId(null); setShowStudentModal(true) }} className="px-4 py-2 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ إضافة طالب</button>
-            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            {isOwnerOrAdmin && <button onClick={() => setShowAnnouncementModal(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📢 إضافة إعلان</button>}
+            {isOwnerOrAdmin ? (
+              <button onClick={() => setPlanModal(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📅 الخطة</button>
+            ) : currentUser?.role === "teacher" ? (
+              <button onClick={() => setShowTeacherPlan(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📅 الخطة</button>
+            ) : null}
+            <button onClick={() => { setStudentForm({ name: "", phone: "", circleId: filterCircle !== "all" ? filterCircle : "" }); setEditingStudentId(null); setShowStudentModal(true) }} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">+ إضافة طالب</button>
           </div>
         </div>
 
