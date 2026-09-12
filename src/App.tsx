@@ -1523,6 +1523,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   }, [student])
 
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
+  const [showPlanPage, setShowPlanPage] = React.useState(false)
 
   // السجلات السابقة = كل السجلات ما عدا الأحدث لكل نوع
   const previousCombined = React.useMemo(() => {
@@ -1549,6 +1550,89 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
   const hasAnyRequired = !!(latestMem || latestSmall || latestLarge)
 
+  // ===== صفحة الخطة السنوية الكاملة (صفحة منفصلة) =====
+  if (showPlanPage) {
+    return (
+      <div className="flex-1 min-h-[70vh]">
+        <div className="max-w-[900px] mx-auto px-4 py-6 space-y-4">
+          <button onClick={()=> setShowPlanPage(false)} className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-[#FAF9F4] transition">
+            <span>→</span> رجوع لصفحة الطالب
+          </button>
+
+          <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b bg-[#FAF9F4]/60">
+              <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📅 الخطة السنوية</h2>
+              <p className="text-xs text-gray-500 mt-1">تفاصيل السنة الدراسية وأيام التسميع والإجازات المعتمدة</p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* السنة الدراسية */}
+              <div>
+                <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> السنة الدراسية</h3>
+                <div className="grid md:grid-cols-2 gap-3 mt-3">
+                  <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
+                    <p className="text-[11px] font-bold text-gray-500">تاريخ البداية</p>
+                    <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.startDate ? fmtBoth(plan.startDate) : "غير محدد"}</p>
+                  </div>
+                  <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
+                    <p className="text-[11px] font-bold text-gray-500">تاريخ النهاية</p>
+                    <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.endDate ? fmtBoth(plan.endDate) : "غير محدد"}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* أيام التسميع */}
+              <div>
+                <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> أيام التسميع الأسبوعية</h3>
+                <p className="text-[11px] text-gray-500 mt-1">الأيام المفعّلة هي أيام الحضور والتسميع المعتمدة</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                  {WEEKDAYS.map((d, i) => (
+                    <div key={i} className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition ${plan.activeWeekdays.includes(i) ? "bg-[#1F5E3A] text-white border-[#1F5E3A] shadow-sm" : "bg-white text-gray-400 border-[#E1E5DA]"}`}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-center mt-3 px-3 py-2 rounded-xl bg-[#E7EFE7] border border-[#1F5E3A]/20 font-bold" style={{color:"#1F5E3A"}}>
+                  الجدول الأسبوعي: {plan.activeWeekdays.length ? plan.activeWeekdays.map(i=> WEEKDAYS[i]).join("، ") : "لم يتم تحديد أيام"}
+                </p>
+              </div>
+
+              {/* الإجازات */}
+              <div>
+                <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> الإجازات والمناسبات <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#E7EFE7] border border-[#1F5E3A]/20 text-[#1F5E3A]">{plan.holidays.length}</span></h3>
+                {plan.holidays.length===0 ? (
+                  <div className="text-center py-8 bg-[#FAF9F4] rounded-xl border border-dashed mt-3">
+                    <p className="text-2xl mb-1">🏖️</p>
+                    <p className="text-xs font-bold text-gray-600">لا توجد إجازات مسجلة حالياً</p>
+                    <p className="text-[11px] text-gray-400 mt-1">سيتم تحديثها من قبل الإدارة عند الحاجة</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 mt-3">
+                    {plan.holidays.map(h=> (
+                      <div key={h.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4] border-[#E1E5DA]">
+                        <div>
+                          <p className="font-bold text-xs" style={{color:"#163F27"}}>{h.name}</p>
+                          <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(h.startDate)} إلى {fmtBoth(h.endDate)}</p>
+                        </div>
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white border text-gray-600">إجازة</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-[#FAF9F4] border border-[#E1E5DA] rounded-xl p-3 text-center">
+                <p className="text-[11px] text-gray-500">💡 هذه الخطة معتمدة من إدارة الحلقة وتُحدّث تلقائياً</p>
+              </div>
+            </div>
+          </div>
+
+          <button onClick={()=> setShowPlanPage(false)} className="w-full py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm transition">العودة لصفحة الطالب</button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1">
       <div className="max-w-[900px] mx-auto px-4 py-6 space-y-4">
@@ -1565,19 +1649,17 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           </div>
         </div>
 
-        {/* ===== المطلوب الآن — في المقدمة وبشكل بارز ===== */}
-        <div className="bg-gradient-to-br from-[#1F5E3A] via-[#1F5E3A] to-[#163F27] rounded-2xl p-[1px] shadow-sm">
-          <div className="bg-gradient-to-br from-[#1F5E3A] to-[#163F27] rounded-2xl p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-white">
-              <h4 className="font-black text-sm flex items-center gap-2">🎯 المطلوب منك الآن <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/15 border border-white/20 backdrop-blur">ركّز هنا أولاً</span></h4>
-              <span className="text-[11px] opacity-80 hidden sm:inline">آخر ما سجّله المعلم — ابدأ به قبل فتح السجل السابق</span>
-            </div>
-            <p className="text-xs text-white/80 mt-1 sm:hidden">آخر ما سجّله المعلم — ابدأ به قبل فتح السجل السابق</p>
+        {/* ===== المطلوب الآن — في المقدمة وبشكل بارز — ألوان موحدة بنظام حلقتي ===== */}
+        <div className="bg-[#1F5E3A] rounded-2xl p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-white">
+            <h4 className="font-black text-sm flex items-center gap-2">🎯 المطلوب منك الآن <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/15 border border-white/20 backdrop-blur">ركّز هنا أولاً</span></h4>
+            <span className="text-[11px] opacity-80 hidden sm:inline">آخر ما سجّله المعلم — ابدأ به قبل فتح السجل السابق</span>
           </div>
+          <p className="text-xs text-white/80 mt-1 sm:hidden">آخر ما سجّله المعلم — ابدأ به قبل فتح السجل السابق</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-3">
-          {/* حفظ جديد */}
+          {/* حفظ جديد — لون موحد */}
           <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMem ? "#1F5E3A" : "#E1E5DA"}}>
             <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMem ? "#1F5E3A" : "#F3F4F6"}}>
               <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>📖 حفظ جديد</p>
@@ -1604,17 +1686,17 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
             </div>
           </div>
 
-          {/* مراجعة صغرى */}
-          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmall ? "#C9A227" : "#E1E5DA"}}>
-            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmall ? "#C9A227" : "#F3F4F6"}}>
+          {/* مراجعة صغرى — لون موحد نفس النظام */}
+          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmall ? "#1F5E3A" : "#E1E5DA"}}>
+            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmall ? "#1F5E3A" : "#F3F4F6"}}>
               <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>🔁 مراجعة صغرى</p>
-              {latestSmall && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#7a5a00]">{latestSmall.ayahCount} آية</span>}
+              {latestSmall && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmall.ayahCount} آية</span>}
             </div>
             <div className="p-3">
               {latestSmall ? (
                 <div>
                   <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestSmall.surahName}</p>
-                  <p className="text-xs font-bold mt-1" style={{color:"#7a5a00"}}>من الآية {latestSmall.fromAyah} إلى {latestSmall.toAyah}</p>
+                  <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestSmall.fromAyah} إلى {latestSmall.toAyah}</p>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestSmall.grade]}}>{latestSmall.grade}</span>
                     <span className="text-[11px] text-gray-500">{fmtBoth(latestSmall.date)}</span>
@@ -1631,17 +1713,17 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
             </div>
           </div>
 
-          {/* مراجعة كبرى */}
-          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarge ? "#2563EB" : "#E1E5DA"}}>
-            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarge ? "#2563EB" : "#F3F4F6"}}>
+          {/* مراجعة كبرى — لون موحد نفس النظام */}
+          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarge ? "#1F5E3A" : "#E1E5DA"}}>
+            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarge ? "#1F5E3A" : "#F3F4F6"}}>
               <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>📚 مراجعة كبرى</p>
-              {latestLarge && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1e40af]">{latestLarge.ayahCount} آية</span>}
+              {latestLarge && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarge.ayahCount} آية</span>}
             </div>
             <div className="p-3">
               {latestLarge ? (
                 <div>
                   <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestLarge.surahName}</p>
-                  <p className="text-xs font-bold mt-1" style={{color:"#1e40af"}}>من الآية {latestLarge.fromAyah} إلى {latestLarge.toAyah}</p>
+                  <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestLarge.fromAyah} إلى {latestLarge.toAyah}</p>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestLarge.grade]}}>{latestLarge.grade}</span>
                     <span className="text-[11px] text-gray-500">{fmtBoth(latestLarge.date)}</span>
@@ -1660,21 +1742,26 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
         </div>
 
         {!hasAnyRequired && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
-            <p className="text-xs font-bold text-amber-800">👋 مرحباً {student.name} — لم يسجّل المعلم أي حفظ أو مراجعة بعد</p>
-            <p className="text-[11px] text-amber-700 mt-1">سيظهر المطلوب منك هنا فور تسجيل المعلم لأول تسميع</p>
+          <div className="bg-[#FAF9F4] border border-[#E1E5DA] rounded-2xl p-3 text-center">
+            <p className="text-xs font-bold" style={{color:"#163F27"}}>👋 مرحباً {student.name} — لم يسجّل المعلم أي حفظ أو مراجعة بعد</p>
+            <p className="text-[11px] text-gray-500 mt-1">سيظهر المطلوب منك هنا فور تسجيل المعلم لأول تسميع</p>
           </div>
         )}
 
-        {/* إحصائيات سريعة */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {/* إحصائيات سريعة + زر الخطة السنوية بجانبها */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
           <MiniStat label="مقدار الحفظ" value={totalAyah + " آية"} />
           <MiniStat label="مقدار المراجعة" value={totalReview + " آية"} />
           <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
           <MiniStat label="عدد الملاحظات" value={String(student.notes.length)} />
+          <button onClick={()=> setShowPlanPage(true)} className="bg-white rounded-xl border-2 border-[#1F5E3A]/20 hover:border-[#1F5E3A] hover:bg-[#E7EFE7]/50 p-3 text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{background:"#1F5E3A", color:"white"}}>📅</span>
+            <span className="text-[11px] font-black" style={{color:"#1F5E3A"}}>الخطة السنوية</span>
+            <span className="text-[10px] font-bold text-gray-500 group-hover:text-[#1F5E3A]">عرض كامل ←</span>
+          </button>
         </div>
 
-        {/* ===== تبويب السجل السابق — تبويب واحد يجمع الكل مع فلتر داخلي ===== */}
+        {/* ===== تبويب السجل السابق — تبويب واحد يجمع الكل مع فلتر داخلي — ألوان موحدة ===== */}
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b bg-[#FAF9F4]/70 flex flex-wrap items-center justify-between gap-3">
             <h4 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>
@@ -1683,9 +1770,9 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
               <span className="hidden sm:inline text-[11px] font-normal text-gray-400">— ما عدا المطلوب المعروض أعلاه</span>
             </h4>
             <div className="flex gap-1 p-1 rounded-full bg-gray-100 border">
-              <button onClick={()=> setHistoryFilter("all")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="all" ? "bg-white shadow-sm text-[#1F5E3A] border" : "text-gray-500 hover:text-gray-700"}`}>الكل</button>
+              <button onClick={()=> setHistoryFilter("all")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="all" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>الكل</button>
               <button onClick={()=> setHistoryFilter("mem")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="mem" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>حفظ فقط</button>
-              <button onClick={()=> setHistoryFilter("review")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="review" ? "bg-[#2563EB] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>مراجعة فقط</button>
+              <button onClick={()=> setHistoryFilter("review")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="review" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>مراجعة فقط</button>
             </div>
           </div>
           <div className="p-4">
@@ -1718,9 +1805,9 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                     if (!e) return null
                     const isSmall = e.reviewType==="small"
                     return (
-                      <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-gray-50 transition">
+                      <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-[#FAF9F4]/50 transition">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background: isSmall ? "#FEF3C7" : "#DBEAFE", color: isSmall ? "#92400E" : "#1E40AF"}}>{isSmall ? "🔁" : "📚"}</span>
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>{isSmall ? "🔁" : "📚"}</span>
                           <div>
                             <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • {staff.find(s=>s.id===e.teacherId)?.name || "—"}</p>
@@ -1742,7 +1829,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           {student.errorsLog.length===0 ? <p className="text-xs text-emerald-700 text-center py-2 bg-emerald-50 border border-emerald-200 rounded-xl">لا يوجد أخطاء مسجلة، ما شاء الله!</p> : (
             <div className="space-y-2">
               {student.errorsLog.map(e=> (
-                <div key={e.id} className="p-3 rounded-xl border bg-red-50/50 border-red-200">
+                <div key={e.id} className="p-3 rounded-xl border bg-red-50/40 border-red-200">
                   <p className="font-bold text-xs text-red-800">{e.type} — <span className="font-normal text-gray-700">{e.description}</span></p>
                   <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                 </div>
@@ -1755,7 +1842,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           {student.notes.length===0 ? <p className="text-xs text-gray-400 text-center py-2">لا توجد ملاحظات</p> : (
             <div className="space-y-2">
               {student.notes.map(n=> (
-                <div key={n.id} className="p-3 rounded-xl border bg-amber-50/50 border-amber-200">
+                <div key={n.id} className="p-3 rounded-xl border bg-[#FAF9F4] border-[#E1E5DA]">
                   <p className="text-xs leading-5">{n.text}</p>
                   <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(n.date)} • {staff.find(s=>s.id===n.authorId)?.name || "—"}</p>
                 </div>
@@ -1771,15 +1858,11 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
             return <div className="space-y-1.5 max-h-[240px] overflow-auto pr-1">{h.slice(0,20).map(r=> (<div key={r.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-[#FAF9F4]"><p className="font-bold text-xs">{fmtBoth(r.date)}</p><span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[r.status]}`}>{r.status}</span></div>))}</div>
           })()}
         </div>
-        <div className="bg-[#163F27] text-white rounded-2xl p-4">
-          <h4 className="font-bold text-xs mb-2">الخطة السنوية</h4>
-          <p className="text-xs opacity-80">السنة: {plan.startDate ? `${fmtBoth(plan.startDate)} إلى ${fmtBoth(plan.endDate)}` : "غير محددة"}</p>
-          <p className="text-xs opacity-80 mt-1">أيام التسميع: {plan.activeWeekdays.map(i=> WEEKDAYS[i]).join("، ") || "—"}</p>
-        </div>
       </div>
     </div>
   )
 }
+
 
 
 function StudentDetail({ student, circles, staff, attendance, currentUserId, plan, onClose, onAddMem, onAddSmall, onAddLarge, onAddError, onAddNote, onUpdate }: {
