@@ -39,6 +39,7 @@ interface AcademicPlan {
 }
 type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "غائب بعذر"
 interface AttendanceRecord { id: string; studentId: string; date: string; status: AttendanceStatus; note?: string; recordedBy: string; createdAt: string }
+interface Announcement { id: string; text: string; createdAt: string; authorId: string; authorName: string }
 
 // ===================== بيانات القرآن =====================
 const SURAHS: { number: number; name: string; ayahCount: number }[] = [
@@ -197,6 +198,9 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>([])
   const [plan, setPlan] = useState<AcademicPlan>({ startDate: todayISO(), endDate: todayISO(), activeWeekdays: [0, 1, 2, 3, 4], holidays: [] })
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
+  const [announcementText, setAnnouncementText] = useState("")
   const [attendanceDate, setAttendanceDate] = useState<string>(todayISO())
   const [attendanceNote, setAttendanceNote] = useState<Record<string,string>>({})
   const [supervisorCircle, setSupervisorCircle] = useState<string>("all")
@@ -257,6 +261,8 @@ export default function App() {
       if (st) setStudents(JSON.parse(st))
       if (p) setPlan(JSON.parse(p))
       if (att) try{ setAttendance(JSON.parse(att)) }catch{}
+      const ann = localStorage.getItem("halqati_announcements")
+      if (ann) try{ setAnnouncements(JSON.parse(ann)) }catch{}
     } catch { }
     // check cloud connection
     const sb = getSupabase()
@@ -266,6 +272,7 @@ export default function App() {
         if (!error) setCloudStatus("Supabase متصل ✓")
         else setCloudStatus("Supabase غير متصل")
       })
+      sb.from("halqati_settings").select("data").eq("id","announcements").maybeSingle().then(({data})=>{ if(data?.data && Array.isArray(data.data)) setAnnouncements(data.data) })
     }
     // handle ?t= token view for parent
     const params = new URLSearchParams(window.location.search)
@@ -301,6 +308,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem("halqati_students", JSON.stringify(students)) }, [students])
   useEffect(() => { localStorage.setItem("halqati_academic_plan", JSON.stringify(plan)) }, [plan])
   useEffect(() => { localStorage.setItem("halqati_attendance", JSON.stringify(attendance)) }, [attendance])
+  useEffect(() => { localStorage.setItem("halqati_announcements", JSON.stringify(announcements)) }, [announcements])
   useEffect(() => {
     if (currentUserId) localStorage.setItem("halqati_session", currentUserId)
     else localStorage.removeItem("halqati_session")
@@ -370,6 +378,7 @@ export default function App() {
         await sb.from("halqati_attendance").upsert(attendance.map(a=>({id:a.id, student_id:a.studentId, date:a.date, status:a.status, note:a.note||null, recorded_by:a.recordedBy})), {onConflict:"id"})
       }
       await sb.from("halqati_settings").upsert({ id: "attendance_backup", data: attendance, updated_at: new Date().toISOString() }, { onConflict: "id" })
+      await sb.from("halqati_settings").upsert({ id: "announcements", data: announcements, updated_at: new Date().toISOString() }, { onConflict: "id" })
       showToast(`تم الرفع: ${circles.length} حلقة • ${staff.length} كادر • ${students.length} طالب`)
       setIsCloudConnected(true)
     } catch (e: any) { showToast("خطأ في الرفع: " + (e.message || "")) }
@@ -378,13 +387,14 @@ export default function App() {
     const sb = getSupabase()
     if (!sb) { showToast("Supabase غير مُعد"); return }
     try {
-      const [cRes, sRes, stRes, pRes, attRes, attSetRes] = await Promise.all([
+      const [cRes, sRes, stRes, pRes, attRes, attSetRes, annRes] = await Promise.all([
         sb.from("halqati_circles").select("*"),
         sb.from("halqati_staff").select("*"),
         sb.from("halqati_students").select("*"),
         sb.from("halqati_settings").select("data").eq("id", "academic_plan").maybeSingle(),
         sb.from("halqati_attendance").select("*"),
-        sb.from("halqati_settings").select("data").eq("id", "attendance_backup").maybeSingle()
+        sb.from("halqati_settings").select("data").eq("id", "attendance_backup").maybeSingle(),
+        sb.from("halqati_settings").select("data").eq("id", "announcements").maybeSingle()
       ])
       if (cRes.error) throw cRes.error
       if (sRes.error) throw sRes.error
@@ -405,6 +415,7 @@ export default function App() {
       } else if (attSetRes.data?.data && Array.isArray(attSetRes.data.data)) {
         setAttendance(attSetRes.data.data)
       }
+      if (annRes.data?.data && Array.isArray(annRes.data.data)) setAnnouncements(annRes.data.data)
       showToast(`تم السحب: ${newCircles.length} حلقة • ${newStaff.length} كادر • ${newStudents.length} طالب`)
       setIsCloudConnected(true)
     } catch (e: any) { showToast("خطأ في السحب: " + (e.message || "")) }
@@ -593,6 +604,21 @@ export default function App() {
       memorization_log: updated.memorizationLog, review_log: updated.reviewLog, errors_log: updated.errorsLog, notes: updated.notes, visit_log: updated.visitLog
     }, { onConflict: "id" }).then()
   }
+  const handleAddAnnouncement = () => {
+    if (!announcementText.trim()) { showToast("اكتب نص الإعلان"); return }
+    const ann: Announcement = { id: uid(), text: announcementText.trim(), createdAt: new Date().toISOString(), authorId: currentUserId||"", authorName: currentUser?.name||"" }
+    const updated = [ann, ...announcements]
+    setAnnouncements(updated)
+    const sb=getSupabase(); if(sb) sb.from("halqati_settings").upsert({id:"announcements", data:updated, updated_at:new Date().toISOString()}, {onConflict:"id"}).then()
+    setAnnouncementText(""); setShowAnnouncementModal(false); showToast("تم نشر الإعلان ✓")
+  }
+  const handleDeleteAnnouncement = (id:string) => {
+    if(!confirm("حذف الإعلان؟")) return
+    const updated = announcements.filter(a=>a.id!==id)
+    setAnnouncements(updated)
+    const sb=getSupabase(); if(sb) sb.from("halqati_settings").upsert({id:"announcements", data:updated, updated_at:new Date().toISOString()}, {onConflict:"id"}).then()
+    showToast("تم حذف الإعلان")
+  }
 
   const handleAddMemorization = () => {
     if (!selectedStudent) return
@@ -655,6 +681,7 @@ export default function App() {
     if (_gToken && _gStudent) {
       return (
         <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+          {announcements.length>0 && <div className="max-w-[900px] mx-auto px-4 pt-4 space-y-2 w-full">{announcements.map(a=> (<div key={a.id} className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2"><span className="text-lg">📢</span><div className="flex-1"><p className="text-sm font-bold" style={{color:"#7a5a00"}}>{a.text}</p><p className="text-[11px] text-amber-800/70">{a.authorName} • {fmtBoth(a.createdAt.slice(0,10))}</p></div></div>))}</div>}
           <ParentTokenView student={_gStudent} circles={circles} staff={staff} attendance={attendance} plan={plan} />
           <Footer />
           {toast && <Toast msg={toast} />}
@@ -695,6 +722,7 @@ export default function App() {
     if (_parentToken && _parentStudent) {
       return (
         <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+          {announcements.length>0 && <div className="max-w-[900px] mx-auto px-4 pt-4 space-y-2 w-full">{announcements.map(a=> (<div key={a.id} className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2"><span className="text-lg">📢</span><div className="flex-1"><p className="text-sm font-bold" style={{color:"#7a5a00"}}>{a.text}</p><p className="text-[11px] text-amber-800/70">{a.authorName} • {fmtBoth(a.createdAt.slice(0,10))}</p></div></div>))}</div>}
           <ParentTokenView student={_parentStudent} circles={circles} staff={staff} attendance={attendance} plan={plan} />
           <Footer />
           {toast && <Toast msg={toast} />}
@@ -863,6 +891,20 @@ export default function App() {
             )}
           </div>
 
+          {/* إعلانات عامة للمشرف أيضاً */}
+          {announcements.length > 0 && (
+            <div className="mb-3 space-y-2">
+              {announcements.map(a=> (
+                <div key={a.id} className="bg-amber-50 border border-amber-200 rounded-2xl p-3 shadow-sm flex items-start gap-2">
+                  <span className="text-lg">📢</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold leading-5" style={{color:"#7a5a00"}}>{a.text}</p>
+                    <p className="text-[10px] text-amber-800/70 mt-1">{a.authorName} • {fmtBoth(a.createdAt.slice(0,10))}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           {/* Summary — مصغر أفقي لتوفير المساحة */}
           <div className="grid grid-cols-4 gap-1.5 mb-3">
             {ATTENDANCE_STATUS.map(st=> (
@@ -982,6 +1024,21 @@ export default function App() {
           </div>
         ) : (
           <>
+        {/* إعلانات عامة — تظهر للجميع */}
+        {announcements.length > 0 && (
+          <div className="mb-6 space-y-3">
+            {announcements.map(a=> (
+              <div key={a.id} className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-start gap-3">
+                <span className="text-xl shrink-0">📢</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold leading-6" style={{color:"#7a5a00"}}>{a.text}</p>
+                  <p className="text-[11px] text-amber-800/70 mt-1">{a.authorName} • {fmtBoth(a.createdAt.slice(0,10))} • {new Date(a.createdAt).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"})}</p>
+                </div>
+                {isOwnerOrAdmin && <button onClick={()=> handleDeleteAnnouncement(a.id)} className="shrink-0 px-2.5 py-1 rounded-full bg-white border border-red-200 text-red-700 text-[11px] font-bold hover:bg-red-50">حذف</button>}
+              </div>
+            ))}
+          </div>
+        )}
         {/* تبويب المدير — الطلاب الحاصلون على ممتاز مرتبون حسب الحلقات (للمدير فقط) */}
         {currentUser?.role === "admin" && (
           <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden mb-6">
@@ -1007,7 +1064,7 @@ export default function App() {
               })
               entries.forEach(([,arr])=> arr.sort((x,y)=> x.name.localeCompare(y.name,"ar")))
               return (
-                <div className="p-3 space-y-4 max-h-[420px] overflow-auto">
+                <div className="p-3 space-y-4">
                   {entries.map(([cid, list])=> {
                     const cname = cid==="__none" ? "بدون حلقة" : (circles.find(c=>c.id===cid)?.name || "حلقة غير معروفة")
                     return (
@@ -1060,6 +1117,7 @@ export default function App() {
             <div className="flex gap-2 flex-wrap">
               {isOwnerOrAdmin && <button onClick={() => setPlanModal(true)} className="lg:hidden px-3 py-2 rounded-xl bg-[#E7EFE7] text-[#1F5E3A] text-xs font-bold border">📅 الخطة</button>}
               {currentUser?.role === "teacher" && <button onClick={() => setShowTeacherPlan(true)} className="lg:hidden px-3 py-2 rounded-xl bg-[#E7EFE7] text-[#1F5E3A] text-xs font-bold border">📅 الخطة</button>}
+              {isOwnerOrAdmin && <button onClick={() => setShowAnnouncementModal(true)} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold">📢 إضافة إعلان</button>}
               <button onClick={() => { setStudentForm({ name: "", phone: "", circleId: filterCircle !== "all" ? filterCircle : "" }); setEditingStudentId(null); setShowStudentModal(true) }} className="px-4 py-2 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ إضافة طالب</button>
             </div>
           </div>
@@ -1119,8 +1177,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Attendance System - فقط للمالك/المدير/المشرف */}
-        {canRecordAttendance && (
+        {/* Attendance System - فقط للمالك والمشرف (مخفي عن المدير حسب الطلب) */}
+        {canRecordAttendance && currentUser?.role !== "admin" && (
           <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden mb-6">
             <div className="px-4 py-3 border-b border-[#E1E5DA] bg-[#FAF9F4]/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
@@ -1390,6 +1448,17 @@ export default function App() {
 
       {planModal && isOwnerOrAdmin && (
         <PlanModal plan={plan} setPlan={setPlan} onClose={() => setPlanModal(false)} onToast={showToast} />
+      )}
+      {showAnnouncementModal && isOwnerOrAdmin && (
+        <Modal title="📢 إضافة إعلان عام" onClose={() => setShowAnnouncementModal(false)}>
+          <label className="text-xs font-bold">نص الإعلان *</label>
+          <textarea value={announcementText} onChange={e=> setAnnouncementText(e.target.value)} rows={4} placeholder="اكتب نص الإعلان الذي سيظهر لجميع الطلاب والمعلمين..." className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-amber-500" />
+          <p className="text-[11px] text-gray-500 mt-2">سيظهر الإعلان مباشرة في أعلى الصفحة لجميع المستخدمين (طلاب، معلمين، مشرفين)</p>
+          <div className="flex gap-2 mt-4">
+            <button onClick={handleAddAnnouncement} className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm">نشر الإعلان 📢</button>
+            <button onClick={()=> setShowAnnouncementModal(false)} className="flex-1 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">إلغاء</button>
+          </div>
+        </Modal>
       )}
 
       {supabaseModal && isOwner && (
