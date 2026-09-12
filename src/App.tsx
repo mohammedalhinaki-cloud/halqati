@@ -1864,7 +1864,6 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const waText = `السلام عليكم ورحمة الله،\nرابط متابعة إنجاز الطالب في حلقة القرآن الكريم (${student.name}):\n${link}`
   const waLink = `https://wa.me/${student.phone.replace(/\D/g, "")}?text=${encodeURIComponent(waText)}`
   const waGeneral = `https://wa.me/?text=${encodeURIComponent(waText)}`
-  const gradeCounts = GRADES.map(g => ({ name: g, count: student.memorizationLog.filter(x => x.grade === g).length }))
   const totalAyah = student.memorizationLog.reduce((a, b) => a + b.ayahCount, 0)
   const totalReview = student.reviewLog.reduce((a, b) => a + b.ayahCount, 0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x => x.grade === "ممتاز").length / student.memorizationLog.length * 100) : 0
@@ -1948,25 +1947,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           </Section>
         </div>
 
-        {/* Grades distribution */}
-        <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">توزيع التقديرات في كل التسميعات</h4>
-          <div className="grid grid-cols-4 gap-2">
-            {gradeCounts.map(g => (
-              <div key={g.name} className="text-center p-3 rounded-xl border" style={{ background: g.count ? GRADE_COLOR[g.name as Grade] + "14" : "#FAF9F4", borderColor: GRADE_COLOR[g.name as Grade] + "30" }}>
-                <p className="font-black text-lg" style={{ color: GRADE_COLOR[g.name as Grade] }}>{g.count}</p>
-                <p className="text-[11px] font-bold" style={{ color: GRADE_COLOR[g.name as Grade] }}>{g.name}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-1.5 mt-3 h-3 rounded-full overflow-hidden border">
-            {GRADES.map(g => {
-              const c = student.memorizationLog.filter(x => x.grade === g).length
-              const pct = student.memorizationLog.length ? (c / student.memorizationLog.length * 100) : 0
-              return c ? <div key={g} style={{ width: pct + "%", background: GRADE_COLOR[g] }} /> : null
-            })}
-          </div>
-        </div>
+
 
         {/* Errors */}
         <Section title="الأخطاء" count={student.errorsLog.length} emptyText="لا يوجد أخطاء، ما شاء الله!" actionLabel="+ تسجيل خطأ" onAction={onAddError}>
