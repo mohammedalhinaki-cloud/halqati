@@ -1507,21 +1507,6 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x=>x.grade==="ممتاز").length / student.memorizationLog.length * 100) : 0
   return (
     <div className="flex-1">
-      {/* Header مبسط لولي الأمر */}
-      <div className="bg-white border-b border-[#E1E5DA] sticky top-0 z-20">
-        <div className="max-w-[900px] mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{background:"#E7EFE7"}}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 19c0-7 4-13 13-15C17.5 13 13 17.5 5 19Z" stroke="#1F5E3A" strokeWidth="1.5" strokeLinejoin="round"/><path d="M6.5 17.2C9 12.5 12.2 9 17.3 6" stroke="#1F5E3A" strokeWidth="1.2" strokeLinecap="round"/></svg>
-            </div>
-            <div>
-              <h2 className="font-black text-[15px]" style={{color:"#163F27"}}>حلقتي — متابعة ولي الأمر</h2>
-              <p className="text-[11px]" style={{color:"#5B6459"}}>عرض فقط بدون تسجيل دخول</p>
-            </div>
-          </div>
-          <span className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700">🔒 عرض آمن للمتابعة فقط</span>
-        </div>
-      </div>
       <div className="max-w-[900px] mx-auto px-4 py-6 space-y-4">
         <div className="bg-white rounded-2xl border p-5 flex items-center gap-4 shadow-sm">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0" style={{background:"#1F5E3A"}}>{student.name.trim().charAt(0)}</div>
