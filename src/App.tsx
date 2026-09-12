@@ -746,7 +746,6 @@ export default function App() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📋 تحضير الحلقة</h2>
-                <p className="text-xs text-gray-500 mt-1">مرحباً {currentUser.name} — مهمتك تسجيل حضور طلاب حلقتك</p>
                 <p className="text-[11px] text-gray-400 mt-1">{fmtDate(attendanceDate)} • {toHijri(attendanceDate)}</p>
               </div>
               <div className="flex items-center gap-2">
