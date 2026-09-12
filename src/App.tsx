@@ -668,7 +668,7 @@ export default function App() {
               <p className="text-2xl mb-2">🔗</p>
               <p className="font-bold text-sm" style={{color:"#163F27"}}>رابط المتابعة غير صالح أو منتهي</p>
               <p className="text-xs text-gray-500 mt-1 leading-5">تأكد من نسخ الرابط كاملاً من المعلم أو تواصل معه للحصول على رابط جديد.</p>
-              <a href={window.location.pathname} className="inline-block mt-4 px-5 py-2 rounded-xl bg-[#1F5E3A] text-white text-xs font-bold">الذهاب للصفحة الرئيسية</a>
+              <p className="text-[11px] text-gray-400 mt-3">هذا الرابط مخصص لولي الأمر — للاستفسار تواصل مع المعلم على واتساب</p>
             </div>
           </div>
           <Footer />
@@ -1479,7 +1479,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
               <p className="text-[11px]" style={{color:"#5B6459"}}>عرض فقط بدون تسجيل دخول</p>
             </div>
           </div>
-          <a href={window.location.pathname} className="px-3 py-1.5 rounded-full bg-[#FAF9F4] border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A]">الرئيسية</a>
+          <span className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700">🔒 عرض آمن للمتابعة فقط</span>
         </div>
       </div>
       <div className="max-w-[900px] mx-auto px-4 py-6 space-y-4">
