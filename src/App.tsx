@@ -637,6 +637,46 @@ export default function App() {
   }
 
   // ============ UI ============
+  // === اعتراض رابط ولي الأمر عالمياً — حتى لو كان المعلم مسجلاً، ?t= يعرض فقط عرضاً مقفلاً بدون أي صلاحيات ===
+  {
+    const _gParams = new URLSearchParams(window.location.search)
+    const _gToken = _gParams.get("t")
+    let _gStudent: Student | null = null
+    if (_gToken) {
+      _gStudent = students.find(x => x.accessToken === _gToken) || null
+      if (!_gStudent) {
+        try {
+          const _raw: any[] = JSON.parse(localStorage.getItem("halqati_students") || "[]")
+          _gStudent = (_raw.find((x: any) => x.accessToken === _gToken) as unknown as Student) || null
+        } catch {}
+      }
+    }
+    if (_gToken && _gStudent) {
+      return (
+        <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+          <ParentTokenView student={_gStudent} circles={circles} staff={staff} attendance={attendance} plan={plan} />
+          <Footer />
+          {toast && <Toast msg={toast} />}
+        </div>
+      )
+    }
+    if (_gToken && !_gStudent) {
+      // حاول جلب من Supabase مرة واحدة إذا لم يوجد محلياً (اختياري سريع)
+      return (
+        <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+            <div className="bg-white rounded-2xl border border-amber-200 p-6 text-center max-w-sm shadow-sm">
+              <p className="text-2xl mb-2">🔗</p>
+              <p className="font-bold text-sm" style={{color:"#163F27"}}>رابط المتابعة غير صالح أو منتهي</p>
+              <p className="text-xs text-gray-500 mt-1 leading-5">تأكد من نسخ الرابط كاملاً من المعلم أو تواصل معه للحصول على رابط جديد.</p>
+              <p className="text-[11px] text-gray-400 mt-3">هذا الرابط مخصص لولي الأمر — للاستفسار تواصل مع المعلم على واتساب</p>
+            </div>
+          </div>
+          <Footer />
+        </div>
+      )
+    }
+  }
   if (!currentUser) {
     // === مسار ولي الأمر عبر ?t= — عرض مباشر بدون تسجيل (حذف نهائي لعناصر الكرت الأبيض من هذا المسار أيضاً) ===
     const _parentParams = new URLSearchParams(window.location.search)
