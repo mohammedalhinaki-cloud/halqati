@@ -827,20 +827,20 @@ export default function App() {
         /* ===== Supervisor dedicated attendance view - بسيطة ومخصصة للتحضير فقط ===== */
         <main className="flex-1 max-w-[900px] w-full mx-auto px-4 py-6">
           {/* Welcome Card */}
-          <div className="bg-white rounded-2xl border border-[#E1E5DA] p-5 mb-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-[#E1E5DA] p-3 mb-4 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
-                <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📋 تحضير الحلقة</h2>
+                <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📋 تسجيل حضور الطلاب</h2>
                 <p className="text-[11px] text-gray-400 mt-1">{fmtBoth(attendanceDate)}</p>
               </div>
               <div className="flex items-center gap-2">
-                <input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)} className="px-4 py-2.5 rounded-xl border border-[#E1E5DA] text-sm bg-white shadow-sm focus:ring-2 focus:ring-[#1F5E3A] outline-none" />
+                <input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)} className="px-3 py-1.5 rounded-xl border border-[#E1E5DA] text-sm bg-white shadow-sm focus:ring-2 focus:ring-[#1F5E3A] outline-none" />
               </div>
             </div>
             {circles.length > 1 && (
-              <div className="mt-4 pt-4 border-t">
+              <div className="mt-3 pt-3 border-t">
                 <label className="text-xs font-bold text-gray-700 mb-1 block">اختر الحلقة</label>
-                <select value={supervisorCircle} onChange={e=>setSupervisorCircle(e.target.value)} className="w-full md:w-[360px] px-4 py-2.5 rounded-xl border border-[#E1E5DA] text-sm bg-white">
+                <select value={supervisorCircle} onChange={e=>setSupervisorCircle(e.target.value)} className="w-full md:w-[360px] px-3 py-1.5 rounded-xl border border-[#E1E5DA] text-sm bg-white">
                   <option value="all">كل الحلقات ({students.length} طالب)</option>
                   {circles.map(c=> {
                     const cnt = students.filter(s=>s.circleId===c.id).length
@@ -850,12 +850,12 @@ export default function App() {
               </div>
             )}
             {circles.length === 1 && (
-              <div className="mt-4 pt-4 border-t">
+              <div className="mt-3 pt-3 border-t">
                 <p className="text-sm font-bold" style={{color:"#1F5E3A"}}>الحلقة: {circles[0].name} • {students.filter(s=>s.circleId===circles[0].id).length} طلاب</p>
               </div>
             )}
             {circles.length === 0 && (
-              <div className="mt-4 pt-4 border-t">
+              <div className="mt-3 pt-3 border-t">
                 <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">⚠️ لا توجد حلقات مسجلة بعد — تواصل مع الإدارة</p>
               </div>
             )}
@@ -871,18 +871,7 @@ export default function App() {
               </div>
             ))}
           </div>
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4 flex items-center justify-between text-xs">
-            <span className="font-bold text-emerald-800">الإجمالي المسجل: {supervisorStats.total} / {supervisorStudents.length}</span>
-            <span className="text-emerald-700 font-bold">{supervisorStats.total===supervisorStudents.length && supervisorStudents.length>0 ? "✓ مكتمل" : `متبقي ${supervisorStudents.length - supervisorStats.total}`}</span>
-          </div>
 
-          {/* Quick bulk */}
-          <div className="flex gap-2 mb-4 flex-wrap items-center bg-white rounded-xl p-3 border shadow-sm">
-            <span className="text-xs font-bold text-gray-600">تسجيل سريع:</span>
-            {ATTENDANCE_STATUS.map(st=> (
-              <button key={st} onClick={()=> { supervisorStudents.forEach(s=> setAttendanceStatus(s.id, st)); showToast(`تم تسجيل ${st} للجميع`)}} className="px-4 py-2 rounded-full text-xs font-bold text-white shadow-sm hover:opacity-90 transition" style={{background:ATTENDANCE_COLOR[st]}}>{st} للجميع</button>
-            ))}
-          </div>
 
           {/* Students List */}
           <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden">
