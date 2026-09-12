@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js"
 
 // ===================== أنواع البيانات =====================
 type Role = "owner" | "admin" | "supervisor" | "teacher"
-type Grade = "ممتاز" | "جيد جدًا" | "جيد" | "يحتاج إعادة"
+type Grade = "ممتاز" | "جيد" | "يحتاج إعادة"
 type ReviewType = "small" | "large"
 type ErrorType = "خطأ في الحفظ" | "نسيان" | "تردد" | "خطأ تجويد" | "تلقين"
 
@@ -67,8 +67,8 @@ const SURAHS: { number: number; name: string; ayahCount: number }[] = [
   [111, "المسد", 5], [112, "الإخلاص", 4], [113, "الفلق", 5], [114, "الناس", 6],
 ].map(([n, name, ayah]) => ({ number: Number(n), name: String(name), ayahCount: Number(ayah) }))
 
-const GRADES: Grade[] = ["ممتاز", "جيد جدًا", "جيد", "يحتاج إعادة"]
-const GRADE_COLOR: Record<Grade, string> = { "ممتاز": "#1F5E3A", "جيد جدًا": "#3F8F5F", "جيد": "#C9A227", "يحتاج إعادة": "#B3492C" }
+const GRADES: Grade[] = ["ممتاز", "جيد", "يحتاج إعادة"]
+const GRADE_COLOR: Record<string, string> = { "ممتاز": "#1F5E3A", "جيد": "#C9A227", "يحتاج إعادة": "#B3492C", "جيد جدًا": "#3F8F5F" }
 const ERROR_TYPES: ErrorType[] = ["خطأ في الحفظ", "نسيان", "تردد", "خطأ تجويد", "تلقين"]
 const ROLE_LABEL: Record<Role, string> = { owner: "المالك الرئيسي", admin: "المدير", supervisor: "المشرف", teacher: "المعلم" }
 const WEEKDAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
@@ -449,11 +449,11 @@ export default function App() {
         id: uid(), name: names[i] + " الطالب", phone: "05" + (10000000 + i * 12345).toString().slice(-8),
         circleId: [c1.id, c2.id, c3.id][i % 3], accessToken: uid() + uid().slice(0, 4),
         memorizationLog: [
-          { id: uid(), date: todayISO(), surahNumber: 2, surahName: "البقرة", fromAyah: 1, toAyah: 5, ayahCount: 5, grade: (["ممتاز", "جيد جدًا", "جيد"][i % 3] as Grade), teacherId: t1.id },
+          { id: uid(), date: todayISO(), surahNumber: 2, surahName: "البقرة", fromAyah: 1, toAyah: 5, ayahCount: 5, grade: (["ممتاز", "جيد", "يحتاج إعادة"][i % 3] as Grade), teacherId: t1.id },
           { id: uid(), date: "2026-09-10", surahNumber: 1, surahName: "الفاتحة", fromAyah: 1, toAyah: 7, ayahCount: 7, grade: "ممتاز" as Grade, teacherId: t1.id },
         ],
         reviewLog: [
-          { id: uid(), date: todayISO(), reviewType: "small" as const, surahNumber: 78, surahName: "النبأ", fromAyah: 1, toAyah: 40, ayahCount: 40, grade: "جيد جدًا" as Grade, teacherId: t1.id }
+          { id: uid(), date: todayISO(), reviewType: "small" as const, surahNumber: 78, surahName: "النبأ", fromAyah: 1, toAyah: 40, ayahCount: 40, grade: "جيد" as Grade, teacherId: t1.id }
         ],
         errorsLog: i % 3 === 0 ? [{ id: uid(), date: todayISO(), type: "تردد" as ErrorType, description: "تردد في آيتين مع تصحيح" }] : [],
         notes: i % 2 === 0 ? [{ id: uid(), date: todayISO(), text: "متميز، استمر على الحفظ اليومي", authorId: t1.id }] : [],
@@ -1144,14 +1144,7 @@ export default function App() {
               <div className="bg-white rounded-xl p-2 border text-center"><p className="text-[10px] text-gray-500 font-bold leading-none">غائب بعذر</p><p className="font-black text-base md:text-lg leading-none mt-1" style={{color:ATTENDANCE_COLOR["غائب بعذر"]}}>{attendanceStatsForDate["غائب بعذر"]}</p><p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p></div>
               <div className="bg-white rounded-xl p-2 border text-center"><p className="text-[10px] text-gray-500 font-bold leading-none">الإجمالي</p><p className="font-black text-base md:text-lg leading-none mt-1" style={{color:"#163F27"}}>{attendanceStatsForDate.total}/{visibleStudents.length}</p><p className="text-[9px] text-gray-400 leading-none mt-0.5">طالب</p></div>
             </div>
-            {/* Bulk */}
-            <div className="flex gap-2 p-3 border-b bg-white flex-wrap">
-              <span className="text-xs font-bold text-gray-600 py-1.5">تسجيل جماعي:</span>
-              {ATTENDANCE_STATUS.map(st=> (
-                <button key={st} onClick={()=> bulkAttendance(st)} className="px-3 py-1.5 rounded-full text-xs font-bold border hover:opacity-90 transition" style={{background: ATTENDANCE_COLOR[st], color:"white"}}>{st} للجميع</button>
-              ))}
-              <button onClick={()=>{ if(confirm("حذف تحضير هذا اليوم؟")){ setAttendance(prev=> prev.filter(a=> a.date!==attendanceDate)); const sb=getSupabase(); if(sb) sb.from("halqati_attendance").delete().eq("date", attendanceDate).then(); showToast("تم حذف تحضير "+fmtBoth(attendanceDate)) } }} className="mr-auto px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold">🗑️ حذف تحضير اليوم</button>
-            </div>
+
             {/* List */}
             <div className="p-3 space-y-2 max-h-[420px] overflow-auto">
               {visibleStudents.length===0 ? <p className="text-xs text-gray-400 text-center py-8">لا يوجد طلاب للتحضير</p> :
