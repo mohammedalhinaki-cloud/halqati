@@ -1283,8 +1283,8 @@ export default function App() {
 
                   <div className="flex gap-1.5">
                     <button onClick={(e) => { e.stopPropagation(); setSelectedStudentId(s.id) }} className="flex-1 py-1.5 rounded-xl bg-[#1F5E3A] text-white text-xs font-bold group-hover:bg-[#163F27] transition">عرض التفاصيل</button>
-                    <button onClick={(e) => { e.stopPropagation(); setEditingStudentId(s.id); setStudentForm({ name: s.name, phone: s.phone, circleId: s.circleId || "" }); setShowStudentModal(true) }} className="px-3 py-1.5 rounded-xl bg-white border text-xs">تعديل</button>
-                    <button onClick={(e) => { e.stopPropagation(); deleteStudent(s.id) }} className="px-2 py-1.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">حذف</button>
+                    {currentUser?.role !== "admin" && <button onClick={(e) => { e.stopPropagation(); setEditingStudentId(s.id); setStudentForm({ name: s.name, phone: s.phone, circleId: s.circleId || "" }); setShowStudentModal(true) }} className="px-3 py-1.5 rounded-xl bg-white border text-xs">تعديل</button>}
+                    {currentUser?.role !== "admin" && <button onClick={(e) => { e.stopPropagation(); deleteStudent(s.id) }} className="px-2 py-1.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">حذف</button>}
                   </div>
                 </div>
               )
@@ -1310,6 +1310,7 @@ export default function App() {
               attendance={attendance}
               currentUserId={currentUserId || ""}
               plan={plan}
+              readOnly={currentUser?.role === "admin"}
               onClose={() => setSelectedStudentId(null)}
               onAddMem={() => setShowMemModal(true)}
               onAddSmall={() => { setReviewForm(f => ({ ...f, date: todayISO() })); setShowReviewModal("small") }}
@@ -2031,8 +2032,8 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
 
 
-function StudentDetail({ student, circles, staff, attendance, currentUserId, plan, onClose, onAddMem, onAddSmall, onAddLarge, onAddError, onAddNote, onUpdate }: {
-  student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; currentUserId: string; plan: AcademicPlan;
+function StudentDetail({ student, circles, staff, attendance, currentUserId, plan, readOnly, onClose, onAddMem, onAddSmall, onAddLarge, onAddError, onAddNote, onUpdate }: {
+  student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; currentUserId: string; plan: AcademicPlan; readOnly?: boolean;
   onClose: () => void; onAddMem: () => void; onAddSmall: () => void; onAddLarge: () => void; onAddError: () => void; onAddNote: () => void;
   onUpdate: (s: Student) => void;
 }) {
@@ -2087,7 +2088,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
         </div>
 
         {/* Memorization */}
-        <Section title="سجل التسميعات" emptyText="لا يوجد سجل حفظ بعد" count={student.memorizationLog.length} actionLabel="+ تسجيل حفظ جديد" onAction={onAddMem}>
+        <Section title="سجل التسميعات" emptyText="لا يوجد سجل حفظ بعد" count={student.memorizationLog.length} actionLabel="+ تسجيل حفظ جديد" onAction={onAddMem} hideAction={readOnly}>
           <div className="space-y-2 max-h-[280px] overflow-auto pr-1">
             {student.memorizationLog.map(e => (
               <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-gray-50">
@@ -2097,7 +2098,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[e.grade] }}>{e.grade}</span>
-                  <button onClick={() => { if (confirm("حذف التسجيل؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== e.id) }) }} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>
+                  {!readOnly && <button onClick={() => { if (confirm("حذف التسجيل؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== e.id) }) }} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
                 </div>
               </div>
             ))}
@@ -2106,18 +2107,18 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
         {/* Review small / large */}
         <div className="grid md:grid-cols-2 gap-4">
-          <Section title="1. مراجعة صغرى" subtitle="الماضي القريب" count={student.reviewLog.filter(x => x.reviewType === "small").length} emptyText="لا توجد مراجعات صغرى" actionLabel="+ تسجيل مراجعة صغرى" onAction={onAddSmall}>
+          <Section title="1. مراجعة صغرى" subtitle="الماضي القريب" count={student.reviewLog.filter(x => x.reviewType === "small").length} emptyText="لا توجد مراجعات صغرى" actionLabel="+ تسجيل مراجعة صغرى" onAction={onAddSmall} hideAction={readOnly}>
             <div className="space-y-2 max-h-[240px] overflow-auto pr-1">
               {student.reviewLog.filter(x => x.reviewType === "small").map(e => (
-                <LogRow key={e.id} e={e} staff={staff} onDelete={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} />
+                <LogRow key={e.id} e={e} staff={staff} onDelete={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} hideDelete={readOnly} />
               ))}
               {student.reviewLog.filter(x => x.reviewType === "small").length === 0 && <p className="text-xs text-gray-400 text-center py-4">لا توجد تسجيلات بعد</p>}
             </div>
           </Section>
-          <Section title="2. مراجعة كبرى" subtitle="الماضي البعيد" count={student.reviewLog.filter(x => x.reviewType === "large").length} emptyText="لا توجد مراجعات كبرى" actionLabel="+ تسجيل مراجعة كبرى" onAction={onAddLarge}>
+          <Section title="2. مراجعة كبرى" subtitle="الماضي البعيد" count={student.reviewLog.filter(x => x.reviewType === "large").length} emptyText="لا توجد مراجعات كبرى" actionLabel="+ تسجيل مراجعة كبرى" onAction={onAddLarge} hideAction={readOnly}>
             <div className="space-y-2 max-h-[240px] overflow-auto pr-1">
               {student.reviewLog.filter(x => x.reviewType === "large").map(e => (
-                <LogRow key={e.id} e={e} staff={staff} onDelete={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} />
+                <LogRow key={e.id} e={e} staff={staff} onDelete={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} hideDelete={readOnly} />
               ))}
               {student.reviewLog.filter(x => x.reviewType === "large").length === 0 && <p className="text-xs text-gray-400 text-center py-4">لا توجد تسجيلات بعد</p>}
             </div>
@@ -2127,7 +2128,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
 
         {/* Errors */}
-        <Section title="الأخطاء" count={student.errorsLog.length} emptyText="لا يوجد أخطاء، ما شاء الله!" actionLabel="+ تسجيل خطأ" onAction={onAddError}>
+        <Section title="الأخطاء" count={student.errorsLog.length} emptyText="لا يوجد أخطاء، ما شاء الله!" actionLabel="+ تسجيل خطأ" onAction={onAddError} hideAction={readOnly}>
           <div className="space-y-2">
             {student.errorsLog.map(e => (
               <div key={e.id} className="p-3 rounded-xl border bg-red-50/50 border-red-200 flex items-center justify-between">
@@ -2135,7 +2136,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                   <p className="font-bold text-xs text-red-800">{e.type} — <span className="font-normal text-gray-700">{e.description}</span></p>
                   <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                 </div>
-                <button onClick={() => onUpdate({ ...student, errorsLog: student.errorsLog.filter(x => x.id !== e.id) })} className="px-2 py-1 rounded-full bg-white border text-xs">حذف</button>
+                {!readOnly && <button onClick={() => onUpdate({ ...student, errorsLog: student.errorsLog.filter(x => x.id !== e.id) })} className="px-2 py-1 rounded-full bg-white border text-xs">حذف</button>}
               </div>
             ))}
             {student.errorsLog.length === 0 && <p className="text-xs text-emerald-700 text-center py-2 bg-emerald-50 border border-emerald-200 rounded-xl">لا يوجد أخطاء مسجلة، ما شاء الله تبارك الله!</p>}
@@ -2143,7 +2144,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
         </Section>
 
         {/* Notes */}
-        <Section title="الملاحظات والتوجيهات" count={student.notes.length} emptyText="لا توجد ملاحظات" actionLabel="إضافة ملاحظة" onAction={onAddNote}>
+        <Section title="الملاحظات والتوجيهات" count={student.notes.length} emptyText="لا توجد ملاحظات" actionLabel="إضافة ملاحظة" onAction={onAddNote} hideAction={readOnly}>
           <div className="space-y-2">
             {student.notes.map(n => (
               <div key={n.id} className="p-3 rounded-xl border bg-amber-50/50 border-amber-200">
@@ -2183,12 +2184,12 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   )
 }
 
-function Section({ title, subtitle, count, emptyText, actionLabel, onAction, children }: { title: string; subtitle?: string; count?: number; emptyText: string; actionLabel: string; onAction: () => void; children: React.ReactNode }) {
+function Section({ title, subtitle, count, emptyText, actionLabel, onAction, children, hideAction }: { title: string; subtitle?: string; count?: number; emptyText: string; actionLabel: string; onAction: () => void; children: React.ReactNode; hideAction?: boolean }) {
   return (
     <div className="bg-white rounded-2xl border p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-bold text-xs">{title} {subtitle && <span className="text-gray-400 font-normal">• {subtitle}</span>} {count !== undefined && <span className="mr-1 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 border"> {count}</span>}</h4>
-        <button onClick={onAction} className="px-3 py-1.5 rounded-full bg-[#1F5E3A] text-white text-[11px] font-bold hover:bg-[#163F27]">{actionLabel}</button>
+        {!hideAction && <button onClick={onAction} className="px-3 py-1.5 rounded-full bg-[#1F5E3A] text-white text-[11px] font-bold hover:bg-[#163F27]">{actionLabel}</button>}
       </div>
       {children}
     </div>
@@ -2197,7 +2198,7 @@ function Section({ title, subtitle, count, emptyText, actionLabel, onAction, chi
 function MiniStat({ label, value }: { label: string; value: string }) {
   return <div className="bg-white rounded-xl border p-3 text-center"><p className="text-[11px] text-gray-500 font-bold">{label}</p><p className="font-black text-sm mt-1" style={{ color: "#1F5E3A" }}>{value}</p></div>
 }
-function LogRow({ e, staff, onDelete }: { e: ReviewEntry; staff: Staff[]; onDelete: () => void }) {
+function LogRow({ e, staff, onDelete, hideDelete }: { e: ReviewEntry; staff: Staff[]; onDelete: () => void; hideDelete?: boolean }) {
   return (
     <div className="flex items-center justify-between p-2.5 rounded-xl border bg-white">
       <div>
@@ -2206,7 +2207,7 @@ function LogRow({ e, staff, onDelete }: { e: ReviewEntry; staff: Staff[]; onDele
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[e.grade] }}>{e.grade}</span>
-        <button onClick={onDelete} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>
+        {!hideDelete && <button onClick={onDelete} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
       </div>
     </div>
   )
