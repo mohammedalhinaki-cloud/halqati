@@ -1997,51 +1997,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           }
         </div>
 
-        {/* Attendance history for this student */}
-        <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">سجل التحضير للطالب</h4>
-          {(() => {
-            const history = attendance.filter(a=>a.studentId===student.id).sort((a,b)=> b.date.localeCompare(a.date))
-            if(history.length===0) return <p className="text-xs text-gray-400 text-center py-4">لا يوجد سجل تحضير بعد</p>
-            const counts = {
-              حاضر: history.filter(h=>h.status==="حاضر").length,
-              غائب: history.filter(h=>h.status==="غائب").length,
-              متأخر: history.filter(h=>h.status==="متأخر").length,
-              "غائب بعذر": history.filter(h=>h.status==="غائب بعذر").length
-            }
-            return (
-              <div>
-                <div className="grid grid-cols-4 gap-2 mb-3">
-                  {ATTENDANCE_STATUS.map(st=> (
-                    <div key={st} className="text-center p-2 rounded-xl border bg-white">
-                      <p className="font-black text-sm" style={{color:ATTENDANCE_COLOR[st]}}>{counts[st]}</p>
-                      <p className="text-[11px] font-bold" style={{color:ATTENDANCE_COLOR[st]}}>{st}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="space-y-1.5 max-h-[220px] overflow-auto pr-1">
-                  {history.slice(0,20).map(h=> (
-                    <div key={h.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-[#FAF9F4]">
-                      <div>
-                        <p className="font-bold text-xs">{fmtBoth(h.date)}</p>
-                        <p className="text-[11px] text-gray-500">بواسطة: {staff.find(s=>s.id===h.recordedBy)?.name || "—"} {h.note ? `• ${h.note}` : ""}</p>
-                      </div>
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[h.status]}`}>{h.status}</span>
-                    </div>
-                  ))}
-                </div>
-                {history.length>20 && <p className="text-[11px] text-gray-400 text-center mt-2">و {history.length-20} سجل إضافي...</p>}
-              </div>
-            )
-          })()}
-        </div>
-        {/* Plan summary */}
-        <div className="bg-[#163F27] text-white rounded-2xl p-4">
-          <h4 className="font-bold text-xs mb-2">الخطة السنوية</h4>
-          <p className="text-xs opacity-80">السنة: {plan.startDate ? `${fmtBoth(plan.startDate)} إلى ${fmtBoth(plan.endDate)}` : "غير محددة"}</p>
-          <p className="text-xs opacity-80 mt-1">أيام التسميع: {plan.activeWeekdays.map(i => WEEKDAYS[i]).join("، ") || "—"}</p>
-          <p className="text-xs opacity-80 mt-1">الإجازات: {plan.holidays.length ? plan.holidays.map(h => h.name).join("، ") : "لا توجد إجازات"}</p>
-        </div>
+
+
 
         <div className="pb-6" />
       </div>
