@@ -1652,7 +1652,6 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
         {/* ===== المطلوب غداً ===== */}
         <div className="bg-[#1F5E3A] rounded-2xl p-4 shadow-sm text-center">
           <h4 className="font-black text-sm text-white">المطلوب غداً</h4>
-          <div className="mt-2 text-white/50 text-[10px] tracking-[3px]">....................................</div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-3">
