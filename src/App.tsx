@@ -912,14 +912,66 @@ export default function App() {
         </main>
       ) : (
       <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-5">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
-          <StatCard label="إجمالي الطلاب" value={stats.total} sub="طالب" />
-          <StatCard label="تسميعات اليوم" value={stats.todayRecits} sub="طالب" accent="emerald" />
-          <StatCard label="حصلوا على ممتاز" value={stats.excellent} sub="طالب" accent="gold" />
-          <StatCard label="يحتاجون متابعة" value={stats.needFollow} sub="طالب" accent="red" highlight={stats.needFollow > 0} />
-          <StatCard label="زاروا الرابط اليوم" value={stats.visitedToday} sub="زيارة" accent="blue" />
-        </div>
+        {/* تبويب المدير — الطلاب الحاصلون على ممتاز مرتبون حسب الحلقات */}
+        {isOwnerOrAdmin && (
+          <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden mb-6">
+            <div className="px-4 py-3 border-b bg-[#FAF9F4]/60 flex items-center justify-between">
+              <h3 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>🏆 الطلاب الحاصلون على ممتاز <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#C9A227]/15 text-[#7a5a00] border border-[#C9A227]/30">{visibleStudents.filter(s=>[...s.memorizationLog, ...s.reviewLog].some((e:any)=>e.grade==="ممتاز")).length} طالب</span></h3>
+              <span className="text-[11px] text-gray-500">مرتبون حسب الحلقة</span>
+            </div>
+            {(() => {
+              const excellent = visibleStudents.filter(s=>[...s.memorizationLog, ...s.reviewLog].some((e:any)=>e.grade==="ممتاز"))
+              if (excellent.length===0) return <p className="text-xs text-gray-400 text-center py-8">لا يوجد طلاب حاصلون على ممتاز حالياً</p>
+              const grouped = new Map<string, typeof excellent>()
+              excellent.forEach(s=> {
+                const k = s.circleId || "__none"
+                if(!grouped.has(k)) grouped.set(k, [])
+                grouped.get(k)!.push(s)
+              })
+              const entries = Array.from(grouped.entries()).sort((a,b)=>{
+                if(a[0]==="__none") return 1
+                if(b[0]==="__none") return -1
+                const na = circles.find(c=>c.id===a[0])?.name || ""
+                const nb = circles.find(c=>c.id===b[0])?.name || ""
+                return na.localeCompare(nb, "ar")
+              })
+              entries.forEach(([,arr])=> arr.sort((x,y)=> x.name.localeCompare(y.name,"ar")))
+              return (
+                <div className="p-3 space-y-4 max-h-[420px] overflow-auto">
+                  {entries.map(([cid, list])=> {
+                    const cname = cid==="__none" ? "بدون حلقة" : (circles.find(c=>c.id===cid)?.name || "حلقة غير معروفة")
+                    return (
+                      <div key={cid} className="border rounded-xl overflow-hidden">
+                        <div className="px-3 py-2 bg-[#1F5E3A] text-white flex items-center justify-between">
+                          <span className="font-bold text-xs">📚 {cname}</span>
+                          <span className="text-[11px] bg-white/20 px-2 py-0.5 rounded-full">{list.length} طالب ممتاز</span>
+                        </div>
+                        <div className="divide-y">
+                          {list.map(s=>{
+                            const excCount = [...s.memorizationLog, ...s.reviewLog].filter((e:any)=>e.grade==="ممتاز").length
+                            const lastExc = [...s.memorizationLog, ...s.reviewLog].filter((e:any)=>e.grade==="ممتاز").sort((a:any,b:any)=> b.date.localeCompare(a.date))[0]
+                            return (
+                              <div key={s.id} onClick={()=> setSelectedStudentId(s.id)} className="flex items-center justify-between p-2.5 hover:bg-[#FAF9F4] cursor-pointer transition">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-white text-xs" style={{background:"#C9A227"}}>{s.name.trim().charAt(0)}</div>
+                                  <div>
+                                    <p className="font-bold text-xs" style={{color:"#163F27"}}>{s.name}</p>
+                                    <p className="text-[11px] text-gray-500">{lastExc ? `${(lastExc as any).surahName || ""} • ${fmtBoth((lastExc as any).date)} • ${excCount} مرة ممتاز` : `${excCount} مرة ممتاز`}</p>
+                                  </div>
+                                </div>
+                                <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white shrink-0" style={{background:"#1F5E3A"}}>ممتاز ★</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
+        )}
 
         {/* Toolbar */}
         <div className="bg-white rounded-2xl border border-[#E1E5DA] p-3 mb-5 shadow-sm">
