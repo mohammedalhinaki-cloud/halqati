@@ -37,6 +37,8 @@ interface AcademicPlan {
   activeWeekdays: number[]; // 0=الأحد ... 6=السبت
   holidays: Holiday[];
 }
+type AttendanceStatus = "حاضر" | "غائب" | "متأخر" | "غائب بعذر"
+interface AttendanceRecord { id: string; studentId: string; date: string; status: AttendanceStatus; note?: string; recordedBy: string; createdAt: string }
 
 // ===================== بيانات القرآن =====================
 const SURAHS: { number: number; name: string; ayahCount: number }[] = [
@@ -70,6 +72,9 @@ const GRADE_COLOR: Record<Grade, string> = { "ممتاز": "#1F5E3A", "جيد ج
 const ERROR_TYPES: ErrorType[] = ["خطأ في الحفظ", "نسيان", "تردد", "خطأ تجويد", "تلقين"]
 const ROLE_LABEL: Record<Role, string> = { owner: "المالك الرئيسي", admin: "المدير", supervisor: "المشرف", teacher: "المعلم" }
 const WEEKDAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
+const ATTENDANCE_STATUS: AttendanceStatus[] = ["حاضر", "غائب", "متأخر", "غائب بعذر"]
+const ATTENDANCE_COLOR: Record<AttendanceStatus, string> = { "حاضر": "#1F5E3A", "غائب": "#B3492C", "متأخر": "#C9A227", "غائب بعذر": "#2563EB" }
+const ATTENDANCE_BG: Record<AttendanceStatus, string> = { "حاضر": "bg-emerald-50 border-emerald-200 text-emerald-700", "غائب": "bg-red-50 border-red-200 text-red-700", "متأخر": "bg-amber-50 border-amber-200 text-amber-700", "غائب بعذر": "bg-blue-50 border-blue-200 text-blue-700" }
 
 // ===================== Supabase =====================
 const SQL_CODE = `-- ============================================================
@@ -106,12 +111,25 @@ CREATE TABLE IF NOT EXISTS halqati_settings (
     data JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS halqati_attendance (
+    id TEXT PRIMARY KEY,
+    student_id TEXT NOT NULL REFERENCES halqati_students(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('حاضر', 'غائب', 'متأخر', 'غائب بعذر')),
+    note TEXT,
+    recorded_by TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(student_id, date)
+);
 CREATE INDEX IF NOT EXISTS idx_halqati_staff_phone ON halqati_staff(phone);
 CREATE INDEX IF NOT EXISTS idx_halqati_students_token ON halqati_students(access_token);
+CREATE INDEX IF NOT EXISTS idx_halqati_attendance_date ON halqati_attendance(date);
+CREATE INDEX IF NOT EXISTS idx_halqati_attendance_student ON halqati_attendance(student_id);
 ALTER TABLE halqati_circles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE halqati_staff ENABLE ROW LEVEL SECURITY;
 ALTER TABLE halqati_students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE halqati_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE halqati_attendance ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public access halqati_circles" ON halqati_circles;
 CREATE POLICY "Public access halqati_circles" ON halqati_circles FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public access halqati_staff" ON halqati_staff;
@@ -120,6 +138,8 @@ DROP POLICY IF EXISTS "Public access halqati_students" ON halqati_students;
 CREATE POLICY "Public access halqati_students" ON halqati_students FOR ALL USING (true) WITH CHECK (true);
 DROP POLICY IF EXISTS "Public access halqati_settings" ON halqati_settings;
 CREATE POLICY "Public access halqati_settings" ON halqati_settings FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public access halqati_attendance" ON halqati_attendance;
+CREATE POLICY "Public access halqati_attendance" ON halqati_attendance FOR ALL USING (true) WITH CHECK (true);
 SELECT 'تم إنشاء جداول نظام حلقتي بنجاح!' AS status;`
 
 function getSupabaseConfig() {
@@ -167,6 +187,9 @@ export default function App() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [plan, setPlan] = useState<AcademicPlan>({ startDate: todayISO(), endDate: todayISO(), activeWeekdays: [0, 1, 2, 3, 4], holidays: [] })
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [attendanceDate, setAttendanceDate] = useState<string>(todayISO())
+  const [attendanceNote, setAttendanceNote] = useState<Record<string,string>>({})
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => localStorage.getItem("halqati_session"))
   const [toast, setToast] = useState<string | null>(null)
   const [search, setSearch] = useState("")
@@ -217,10 +240,12 @@ export default function App() {
       const s = localStorage.getItem("halqati_staff")
       const st = localStorage.getItem("halqati_students")
       const p = localStorage.getItem("halqati_academic_plan")
+      const att = localStorage.getItem("halqati_attendance")
       if (c) setCircles(JSON.parse(c))
       if (s) setStaff(JSON.parse(s))
       if (st) setStudents(JSON.parse(st))
       if (p) setPlan(JSON.parse(p))
+      if (att) try{ setAttendance(JSON.parse(att)) }catch{}
     } catch { }
     // check cloud connection
     const sb = getSupabase()
@@ -264,13 +289,16 @@ export default function App() {
   useEffect(() => { localStorage.setItem("halqati_staff", JSON.stringify(staff)) }, [staff])
   useEffect(() => { localStorage.setItem("halqati_students", JSON.stringify(students)) }, [students])
   useEffect(() => { localStorage.setItem("halqati_academic_plan", JSON.stringify(plan)) }, [plan])
+  useEffect(() => { localStorage.setItem("halqati_attendance", JSON.stringify(attendance)) }, [attendance])
   useEffect(() => {
     if (currentUserId) localStorage.setItem("halqati_session", currentUserId)
     else localStorage.removeItem("halqati_session")
   }, [currentUserId])
 
   const currentUser = useMemo(() => staff.find(x => x.id === currentUserId) || null, [staff, currentUserId])
+  const isOwner = currentUser?.role === "owner"
   const isOwnerOrAdmin = currentUser && ["owner", "admin", "supervisor"].includes(currentUser.role)
+  const canRecordAttendance = currentUser && ["owner", "admin", "supervisor"].includes(currentUser.role)
   const hasOwner = staff.some(s => s.role === "owner")
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2800) }
@@ -298,6 +326,11 @@ export default function App() {
         memorization_log: s.memorizationLog, review_log: s.reviewLog, errors_log: s.errorsLog, notes: s.notes, visit_log: s.visitLog
       })), { onConflict: "id" })
       await sb.from("halqati_settings").upsert({ id: "academic_plan", data: plan, updated_at: new Date().toISOString() }, { onConflict: "id" })
+      // Attendance -> halqati_attendance table + backup in settings
+      if (attendance.length) {
+        await sb.from("halqati_attendance").upsert(attendance.map(a=>({id:a.id, student_id:a.studentId, date:a.date, status:a.status, note:a.note||null, recorded_by:a.recordedBy})), {onConflict:"id"})
+      }
+      await sb.from("halqati_settings").upsert({ id: "attendance_backup", data: attendance, updated_at: new Date().toISOString() }, { onConflict: "id" })
       showToast(`تم الرفع: ${circles.length} حلقة • ${staff.length} كادر • ${students.length} طالب`)
       setIsCloudConnected(true)
     } catch (e: any) { showToast("خطأ في الرفع: " + (e.message || "")) }
@@ -306,11 +339,13 @@ export default function App() {
     const sb = getSupabase()
     if (!sb) { showToast("Supabase غير مُعد"); return }
     try {
-      const [cRes, sRes, stRes, pRes] = await Promise.all([
+      const [cRes, sRes, stRes, pRes, attRes, attSetRes] = await Promise.all([
         sb.from("halqati_circles").select("*"),
         sb.from("halqati_staff").select("*"),
         sb.from("halqati_students").select("*"),
-        sb.from("halqati_settings").select("data").eq("id", "academic_plan").maybeSingle()
+        sb.from("halqati_settings").select("data").eq("id", "academic_plan").maybeSingle(),
+        sb.from("halqati_attendance").select("*"),
+        sb.from("halqati_settings").select("data").eq("id", "attendance_backup").maybeSingle()
       ])
       if (cRes.error) throw cRes.error
       if (sRes.error) throw sRes.error
@@ -325,6 +360,12 @@ export default function App() {
       setStaff(newStaff)
       setStudents(newStudents)
       if (pRes.data?.data) setPlan(pRes.data.data)
+      // Attendance: prefer table, fallback to settings backup
+      if (attRes.data && attRes.data.length) {
+        setAttendance(attRes.data.map((x:any)=>({id:x.id, studentId:x.student_id, date:x.date, status:x.status as AttendanceStatus, note:x.note||"", recordedBy:x.recorded_by||"", createdAt:x.created_at||""})))
+      } else if (attSetRes.data?.data && Array.isArray(attSetRes.data.data)) {
+        setAttendance(attSetRes.data.data)
+      }
       showToast(`تم السحب: ${newCircles.length} حلقة • ${newStaff.length} كادر • ${newStudents.length} طالب`)
       setIsCloudConnected(true)
     } catch (e: any) { showToast("خطأ في السحب: " + (e.message || "")) }
@@ -479,6 +520,33 @@ export default function App() {
     showToast("تم الحذف")
   }
 
+  // ===== Attendance helpers =====
+  const getAttendanceFor = (studentId:string, date:string) => attendance.find(a=>a.studentId===studentId && a.date===date)
+  const setAttendanceStatus = (studentId:string, status:AttendanceStatus) => {
+    const existing = attendance.find(a=>a.studentId===studentId && a.date===attendanceDate)
+    if (existing) {
+      setAttendance(prev=> prev.map(a=> a.id===existing.id ? {...a, status, note: attendanceNote[studentId]||a.note||"", recordedBy: currentUserId||"", createdAt: new Date().toISOString()} : a))
+      const sb=getSupabase(); if(sb) sb.from("halqati_attendance").upsert({id: existing.id, student_id: studentId, date: attendanceDate, status, note: attendanceNote[studentId]||existing.note||null, recorded_by: currentUserId||""}, {onConflict:"id"}).then()
+    } else {
+      const rec: AttendanceRecord = {id: uid(), studentId, date: attendanceDate, status, note: attendanceNote[studentId]||"", recordedBy: currentUserId||"", createdAt: new Date().toISOString()}
+      setAttendance(prev=> [...prev, rec])
+      const sb=getSupabase(); if(sb) sb.from("halqati_attendance").insert({id: rec.id, student_id: rec.studentId, date: rec.date, status: rec.status, note: rec.note||null, recorded_by: rec.recordedBy}).then()
+    }
+  }
+  const bulkAttendance = (status:AttendanceStatus) => {
+    visibleStudents.forEach(s=> setAttendanceStatus(s.id, status))
+    showToast(`تم تسجيل ${status} للجميع في ${fmtDate(attendanceDate)}`)
+  }
+  const attendanceStatsForDate = (()=>{
+    const list = attendance.filter(a=>a.date===attendanceDate)
+    return {
+      حاضر: list.filter(a=>a.status==="حاضر").length,
+      غائب: list.filter(a=>a.status==="غائب").length,
+      متأخر: list.filter(a=>a.status==="متأخر").length,
+      "غائب بعذر": list.filter(a=>a.status==="غائب بعذر").length,
+      total: list.length
+    }
+  })()
   const persistStudent = (updated: Student) => {
     setStudents(prev => prev.map(s => s.id === updated.id ? updated : s))
     const sb = getSupabase(); if (sb) sb.from("halqati_students").upsert({
@@ -538,13 +606,15 @@ export default function App() {
       <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
           <div className="w-full max-w-sm">
-            {/* Supabase status pill */}
+            {/* Supabase status pill - فقط للمالك في مرحلة التأسيس */}
+            {!hasOwner && (
             <div className="flex justify-center mb-4">
               <button onClick={() => setSupabaseModal(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition ${isCloudConnected ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
                 <span className={`w-2 h-2 rounded-full ${isCloudConnected ? "bg-emerald-500" : "bg-amber-500"} animate-pulse`} />
                 {isCloudConnected ? "Supabase متصل" : "ربط Supabase"}
               </button>
             </div>
+            )}
 
             <div className="flex flex-col items-center mb-6">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-3 shadow-sm" style={{ background: "#E7EFE7" }}>
@@ -583,7 +653,7 @@ export default function App() {
                     {loginError && <p className="text-xs text-red-600 mt-2">{loginError}</p>}
                     <button onClick={handleLogin} className="w-full mt-4 py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm transition">دخول النظام</button>
                     <button onClick={loadDemo} className="w-full mt-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200 transition">✨ أو تعبئة بيانات نموذجية تجريبية للتجربة السريعة</button>
-                    <button onClick={() => setSupabaseModal(true)} className="w-full mt-2 py-2 rounded-xl bg-white border border-[#E1E5DA] text-[#1F5E3A] font-bold text-xs hover:bg-gray-50 transition">⚙️ إعداد وحفظ مفاتيح Supabase</button>
+                    {false && <button onClick={() => setSupabaseModal(true)} className="w-full mt-2 py-2 rounded-xl bg-white border border-[#E1E5DA] text-[#1F5E3A] font-bold text-xs hover:bg-gray-50 transition">⚙️ إعداد وحفظ مفاتيح Supabase</button>}
                     <p className="text-[11px] text-center text-gray-400 mt-3">💡 هل ترغب بحفظ البيانات سحابياً؟ اربط Supabase لتبقى بياناتك محفوظة ومزامنة بين كل الأجهزة.</p>
                   </div>
                 )}
@@ -596,7 +666,7 @@ export default function App() {
 
         <Footer />
 
-        {supabaseModal && (
+        {supabaseModal && !hasOwner && (
           <SupabaseModal
             url={supabaseUrlInput} setUrl={setSupabaseUrlInput}
             keyVal={supabaseKeyInput} setKey={setSupabaseKeyInput}
@@ -627,13 +697,13 @@ export default function App() {
               <h2 className="font-black text-[15px]" style={{ color: "#163F27" }}>حلقتي</h2>
               <p className="text-[11px]" style={{ color: "#5B6459" }}>{currentUser.name} • {ROLE_LABEL[currentUser.role]} {currentUser.circleId ? "• " + (circles.find(c => c.id === currentUser.circleId)?.name || "") : ""}</p>
             </div>
-            <span className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${isCloudConnected ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+            {isOwner && <span className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${isCloudConnected ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isCloudConnected ? "bg-emerald-500" : "bg-amber-500"}`} /> {isCloudConnected ? "Supabase متصل" : "محلي"}
-            </span>
+            </span>}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>
-            <button onClick={() => setSupabaseModal(true)} className="px-3 py-1.5 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-gray-50">⚙️ Supabase</button>
+            {isOwner && <button onClick={() => setSupabaseModal(true)} className="px-3 py-1.5 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-gray-50">⚙️ Supabase</button>}
             <button onClick={() => { setCurrentUserId(null); showToast("تم تسجيل الخروج") }} className="px-3 py-1.5 rounded-full bg-[#B3492C] hover:bg-[#963d25] text-white text-xs font-bold">خروج</button>
           </div>
         </div>
@@ -724,6 +794,72 @@ export default function App() {
           </div>
         )}
 
+        {/* Attendance System - فقط للمالك/المدير/المشرف */}
+        {canRecordAttendance && (
+          <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden mb-6">
+            <div className="px-4 py-3 border-b border-[#E1E5DA] bg-[#FAF9F4]/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>📋 نظام التحضير اليومي <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">{fmtDate(attendanceDate)} • {toHijri(attendanceDate)}</span></h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">تسجيل حضور وغياب الطلاب — يظهر فقط للمالك والمدير والمشرف</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input type="date" value={attendanceDate} onChange={e=>setAttendanceDate(e.target.value)} className="px-3 py-1.5 rounded-xl border border-[#E1E5DA] text-sm bg-white" />
+                <select value={filterCircle} onChange={e=>setFilterCircle(e.target.value)} className="px-3 py-1.5 rounded-xl border border-[#E1E5DA] text-sm bg-white">
+                  <option value="all">كل الحلقات</option>
+                  {circles.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="">بدون حلقة</option>
+                </select>
+              </div>
+            </div>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 p-3 bg-gray-50/50 border-b">
+              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">حاضر</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["حاضر"]}}>{attendanceStatsForDate["حاضر"]}</p></div>
+              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">غائب</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["غائب"]}}>{attendanceStatsForDate["غائب"]}</p></div>
+              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">متأخر</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["متأخر"]}}>{attendanceStatsForDate["متأخر"]}</p></div>
+              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">غائب بعذر</p><p className="font-black text-lg" style={{color:ATTENDANCE_COLOR["غائب بعذر"]}}>{attendanceStatsForDate["غائب بعذر"]}</p></div>
+              <div className="bg-white rounded-xl p-2.5 border text-center"><p className="text-[11px] text-gray-500 font-bold">الإجمالي المسجل</p><p className="font-black text-lg" style={{color:"#163F27"}}>{attendanceStatsForDate.total} / {visibleStudents.length}</p></div>
+            </div>
+            {/* Bulk */}
+            <div className="flex gap-2 p-3 border-b bg-white flex-wrap">
+              <span className="text-xs font-bold text-gray-600 py-1.5">تسجيل جماعي:</span>
+              {ATTENDANCE_STATUS.map(st=> (
+                <button key={st} onClick={()=> bulkAttendance(st)} className="px-3 py-1.5 rounded-full text-xs font-bold border hover:opacity-90 transition" style={{background: ATTENDANCE_COLOR[st], color:"white"}}>{st} للجميع</button>
+              ))}
+              <button onClick={()=>{ if(confirm("حذف تحضير هذا اليوم؟")){ setAttendance(prev=> prev.filter(a=> a.date!==attendanceDate)); const sb=getSupabase(); if(sb) sb.from("halqati_attendance").delete().eq("date", attendanceDate).then(); showToast("تم حذف تحضير "+fmtDate(attendanceDate)) } }} className="mr-auto px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold">🗑️ حذف تحضير اليوم</button>
+            </div>
+            {/* List */}
+            <div className="p-3 space-y-2 max-h-[420px] overflow-auto">
+              {visibleStudents.length===0 ? <p className="text-xs text-gray-400 text-center py-8">لا يوجد طلاب للتحضير</p> :
+                visibleStudents.map(s=>{
+                  const rec = getAttendanceFor(s.id, attendanceDate)
+                  const circleName = circles.find(c=>c.id===s.circleId)?.name || "بدون حلقة"
+                  return (
+                    <div key={s.id} className="flex flex-col md:flex-row md:items-center gap-2 p-3 rounded-2xl border hover:bg-[#FAF9F4]/60 transition bg-white">
+                      <div className="flex items-center gap-2.5 flex-1">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm" style={{background: rec ? ATTENDANCE_COLOR[rec.status] : "#E7EFE7", color: rec ? "white":"#1F5E3A"}}>{s.name.charAt(0)}</div>
+                        <div className="flex-1">
+                          <p className="font-bold text-[13px]" style={{color:"#20281F"}}>{s.name} <span className="text-[11px] text-gray-400 font-normal">• {circleName}</span></p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {ATTENDANCE_STATUS.map(st=> (
+                              <button key={st} onClick={()=> setAttendanceStatus(s.id, st)} className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition ${rec?.status===st ? "text-white shadow-sm" : "bg-white hover:bg-gray-50"}`} style={rec?.status===st ? {background: ATTENDANCE_COLOR[st], borderColor: ATTENDANCE_COLOR[st]} : {}}>{st}</button>
+                            ))}
+                          </div>
+                          {rec && <p className="text-[11px] text-gray-500 mt-1">تم بواسطة: {staff.find(x=>x.id===rec.recordedBy)?.name || "—"} • {rec.note ? `ملاحظة: ${rec.note}` : ""}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                        <input placeholder="ملاحظة (اختياري)" value={attendanceNote[s.id] ?? rec?.note ?? ""} onChange={e=> setAttendanceNote(prev=> ({...prev, [s.id]: e.target.value}))} onBlur={()=>{ if(rec) setAttendanceStatus(s.id, rec.status)}} className="flex-1 md:w-[160px] px-2.5 py-1.5 rounded-xl border border-[#E1E5DA] text-xs bg-white" />
+                        {rec ? <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[rec.status]}`}>{rec.status}</span> : <span className="px-2.5 py-1 rounded-full text-[11px] font-bold border bg-gray-50 text-gray-500">لم يُحضّر</span>}
+                      </div>
+                    </div>
+                  )
+                })
+              }
+            </div>
+            <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 text-[11px] text-amber-800 text-center">💡 التحضير يُحفظ تلقائياً في المتصفح و Supabase (إذا كان الربط مفعّلاً من قبل المالك) • التاريخ الهجري: {toHijri(attendanceDate)}</div>
+          </div>
+        )}
+
         {/* Students Grid */}
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold" style={{ color: "#163F27" }}>الطلاب ({visibleStudents.length})</h3>
@@ -791,6 +927,7 @@ export default function App() {
               student={selectedStudent}
               circles={circles}
               staff={staff}
+              attendance={attendance}
               currentUserId={currentUserId || ""}
               plan={plan}
               onClose={() => setSelectedStudentId(null)}
@@ -934,7 +1071,7 @@ export default function App() {
         <PlanModal plan={plan} setPlan={setPlan} onClose={() => setPlanModal(false)} onToast={showToast} />
       )}
 
-      {supabaseModal && (
+      {supabaseModal && isOwner && (
         <SupabaseModal
           url={supabaseUrlInput} setUrl={setSupabaseUrlInput}
           keyVal={supabaseKeyInput} setKey={setSupabaseKeyInput}
@@ -1149,8 +1286,8 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
   )
 }
 
-function StudentDetail({ student, circles, staff, currentUserId, plan, onClose, onAddMem, onAddSmall, onAddLarge, onAddError, onAddNote, onUpdate }: {
-  student: Student; circles: Circle[]; staff: Staff[]; currentUserId: string; plan: AcademicPlan;
+function StudentDetail({ student, circles, staff, attendance, currentUserId, plan, onClose, onAddMem, onAddSmall, onAddLarge, onAddError, onAddNote, onUpdate }: {
+  student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; currentUserId: string; plan: AcademicPlan;
   onClose: () => void; onAddMem: () => void; onAddSmall: () => void; onAddLarge: () => void; onAddError: () => void; onAddNote: () => void;
   onUpdate: (s: Student) => void;
 }) {
@@ -1311,6 +1448,44 @@ function StudentDetail({ student, circles, staff, currentUserId, plan, onClose, 
           }
         </div>
 
+        {/* Attendance history for this student */}
+        <div className="bg-white rounded-2xl border p-4">
+          <h4 className="font-bold text-xs mb-3">سجل التحضير للطالب</h4>
+          {(() => {
+            const history = attendance.filter(a=>a.studentId===student.id).sort((a,b)=> b.date.localeCompare(a.date))
+            if(history.length===0) return <p className="text-xs text-gray-400 text-center py-4">لا يوجد سجل تحضير بعد</p>
+            const counts = {
+              حاضر: history.filter(h=>h.status==="حاضر").length,
+              غائب: history.filter(h=>h.status==="غائب").length,
+              متأخر: history.filter(h=>h.status==="متأخر").length,
+              "غائب بعذر": history.filter(h=>h.status==="غائب بعذر").length
+            }
+            return (
+              <div>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {ATTENDANCE_STATUS.map(st=> (
+                    <div key={st} className="text-center p-2 rounded-xl border bg-white">
+                      <p className="font-black text-sm" style={{color:ATTENDANCE_COLOR[st]}}>{counts[st]}</p>
+                      <p className="text-[11px] font-bold" style={{color:ATTENDANCE_COLOR[st]}}>{st}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1.5 max-h-[220px] overflow-auto pr-1">
+                  {history.slice(0,20).map(h=> (
+                    <div key={h.id} className="flex items-center justify-between p-2.5 rounded-xl border bg-[#FAF9F4]">
+                      <div>
+                        <p className="font-bold text-xs">{fmtDate(h.date)} • <span className="font-normal text-gray-500">{toHijri(h.date)}</span></p>
+                        <p className="text-[11px] text-gray-500">بواسطة: {staff.find(s=>s.id===h.recordedBy)?.name || "—"} {h.note ? `• ${h.note}` : ""}</p>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[h.status]}`}>{h.status}</span>
+                    </div>
+                  ))}
+                </div>
+                {history.length>20 && <p className="text-[11px] text-gray-400 text-center mt-2">و {history.length-20} سجل إضافي...</p>}
+              </div>
+            )
+          })()}
+        </div>
         {/* Plan summary */}
         <div className="bg-[#163F27] text-white rounded-2xl p-4">
           <h4 className="font-bold text-xs mb-2">الخطة السنوية</h4>
