@@ -189,6 +189,11 @@ const linkForStudent = (s: Student) => {
   const base = window.location.origin + window.location.pathname
   return `${base}?t=${s.accessToken}`
 }
+// helper: هل زار الطالب رابط المتابعة اليوم؟ (يتجدد كل يوم — بدون عدّ تراكمي)
+const hasVisitedToday = (s: Student) => {
+  const today = todayISO()
+  return (s.visitLog || []).some(v => v.date === today)
+}
 
 // ===================== App =====================
 export default function App() {
@@ -283,20 +288,31 @@ export default function App() {
         const found = JSON.parse(localStorage.getItem("halqati_students") || "[]").find((x: Student) => x.accessToken === t)
         if (found) {
           setSelectedStudentId(found.id)
-          // log visit
+          // log visit — علامة يومية فقط (مرة واحدة في اليوم، يتجدد تلقائياً غداً)
           const today = todayISO()
+          let _updatedStudentForCloud: Student | null = null
           const updated = JSON.parse(localStorage.getItem("halqati_students") || "[]").map((s: Student) => {
             if (s.id === found.id) {
               const visits = s.visitLog || []
-              const idx = visits.findIndex(v => v.date === today)
-              if (idx >= 0) visits[idx].count += 1
-              else visits.push({ date: today, count: 1 })
-              return { ...s, visitLog: visits }
+              const alreadyVisitedToday = visits.some((v: any) => v.date === today)
+              if (!alreadyVisitedToday) {
+                const newVisits = [...visits, { date: today, count: 1 }]
+                const ns = { ...s, visitLog: newVisits }
+                _updatedStudentForCloud = ns as Student
+                return ns
+              }
+              _updatedStudentForCloud = null
+              return s
             }
             return s
           })
           localStorage.setItem("halqati_students", JSON.stringify(updated))
           setStudents(updated)
+          if (_updatedStudentForCloud) {
+            const _s = _updatedStudentForCloud as Student
+            const sb2 = getSupabase()
+            if (sb2) sb2.from("halqati_students").upsert({ id: _s.id, name: _s.name, phone: _s.phone, circle_id: _s.circleId, access_token: _s.accessToken, memorization_log: _s.memorizationLog, review_log: _s.reviewLog, errors_log: _s.errorsLog, notes: _s.notes, visit_log: _s.visitLog }, { onConflict: "id" }).then()
+          }
         }
       }, 300)
     }
@@ -468,7 +484,7 @@ export default function App() {
         ],
         errorsLog: i % 3 === 0 ? [{ id: uid(), date: todayISO(), type: "تردد" as ErrorType, description: "تردد في آيتين مع تصحيح" }] : [],
         notes: i % 2 === 0 ? [{ id: uid(), date: todayISO(), text: "متميز، استمر على الحفظ اليومي", authorId: t1.id }] : [],
-        visitLog: [{ date: todayISO(), count: Math.floor(Math.random() * 3) }]
+        visitLog: Math.random() > 0.5 ? [{ date: todayISO(), count: 1 }] : []
       }
     })
     setCircles([c1, c2, c3])
@@ -1267,7 +1283,10 @@ export default function App() {
                         <p className="text-[11px] text-gray-500">{circleName2} • {s.phone || "—"}</p>
                       </div>
                     </div>
-                    {lastGrade && <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[lastGrade] }}>{lastGrade}</span>}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {lastGrade && <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[lastGrade] }}>{lastGrade}</span>}
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full border flex items-center gap-1 ${hasVisitedToday(s) ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>{hasVisitedToday(s) ? "✓ زار اليوم" : "○ لم يزر"}</span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-center mb-3">
@@ -2076,7 +2095,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             <a href={student.phone ? waLink : waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 rounded-xl bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-bold">📱 واتساب لولي الأمر</a>
             <a href={waGeneral} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl bg-white border text-xs font-bold">مشاركة عامة</a>
           </div>
-          <p className="text-[11px] text-gray-500 mt-2">آخر زيارة: {student.visitLog[0]?.date ? fmtBoth(student.visitLog[0].date) + ` (${student.visitLog.length} زيارة)` : "لم يزر بعد"} • مجموع الزيارات: {student.visitLog.reduce((a, b) => a + b.count, 0)}</p>
+          {(() => { const _visitedToday = (student.visitLog || []).some(v => v.date === todayISO()); return (<div className="mt-3 flex flex-col gap-1"><span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border w-fit ${ _visitedToday ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}><span className={`w-1.5 h-1.5 rounded-full ${ _visitedToday ? "bg-emerald-500" : "bg-amber-500"}`}></span>{_visitedToday ? "✓ زار رابط المتابعة اليوم" : "○ لم يزر رابط المتابعة اليوم"}</span><span className="text-[10px] text-gray-400">يتجدد تلقائياً كل يوم — يظهر "زار" فقط إذا دخل ولي الأمر رابط المتابعة خلال اليوم الحالي</span></div>)})()}
         </div>
 
         {/* Stats */}
