@@ -1801,17 +1801,7 @@ export default function App() {
                     </div>
 
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                    <div className="bg-[#FAF9F4] rounded-xl py-2 border"><p className="font-black text-sm" style={{ color: "#1F5E3A" }}>{s.memorizationLog.length}</p><p className="text-[10px] text-gray-500">حفظ</p></div>
-                    <div className="bg-[#FAF9F4] rounded-xl py-2 border"><p className="font-black text-sm" style={{ color: "#C9A227" }}>{s.reviewLog.length}</p><p className="text-[10px] text-gray-500">مراجعة</p></div>
-                    <div className="bg-[#FAF9F4] rounded-xl py-2 border"><p className="font-black text-sm" style={{ color: "#B3492C" }}>{s.errorsLog.length}</p><p className="text-[10px] text-gray-500">أخطاء</p></div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-gray-500 mb-3">
-                    <span>أوجه محفوظة: <b style={{ color: "#1F5E3A" }}>{formatWajh(totalAyahs)}</b></span>
-                    <span>الحفظ القادم: {s.memorizationLog[0] ? `${s.memorizationLog[0].surahName} ${s.memorizationLog[0].toAyah + 1}` : "—"}</span>
-                  </div>
+                  {/* تم حذف المربعات الثلاث والعبارة (أوجه محفوظة/الحفظ القادم) بناءً على طلب المستخدم */}
 
                   <div className="flex gap-1.5">
                     <button onClick={(e) => { e.stopPropagation(); setSelectedStudentId(s.id) }} className="flex-1 py-1.5 rounded-xl bg-[#1F5E3A] text-white text-xs font-bold group-hover:bg-[#163F27] transition">عرض التفاصيل</button>
