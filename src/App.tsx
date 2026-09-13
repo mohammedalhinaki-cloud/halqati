@@ -2305,21 +2305,37 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   const totalReview = student.reviewLog.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x=>x.grade==="ممتاز").length / student.memorizationLog.length * 100) : 0
 
-  // آخر سجل  (حسب اختيار المستخدم)
-  const latestMem = React.useMemo(() => {
+  // آخر سجل — مجمع حسب التاريخ (إصلاح: كل السور بنفس التاريخ تظهر معاً في المطلوب غداً)
+  const latestMemDate = React.useMemo(() => {
     if (!student.memorizationLog.length) return null
-    return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as MemorizationEntry
+    return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date))[0].date
   }, [student])
-  const latestSmall = React.useMemo(() => {
+  const latestMems = React.useMemo(() => {
+    if (!latestMemDate) return []
+    return student.memorizationLog.filter(x=> x.date === latestMemDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [student, latestMemDate])
+  const latestSmallDate = React.useMemo(() => {
     const arr = student.reviewLog.filter(x=> x.reviewType === "small")
     if (!arr.length) return null
-    return [...arr].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as ReviewEntry
+    return [...arr].sort((a,b)=> b.date.localeCompare(a.date))[0].date
   }, [student])
-  const latestLarge = React.useMemo(() => {
+  const latestSmalls = React.useMemo(() => {
+    if (!latestSmallDate) return []
+    return student.reviewLog.filter(x=> x.reviewType === "small" && x.date === latestSmallDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [student, latestSmallDate])
+  const latestLargeDate = React.useMemo(() => {
     const arr = student.reviewLog.filter(x=> x.reviewType === "large")
     if (!arr.length) return null
-    return [...arr].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as ReviewEntry
+    return [...arr].sort((a,b)=> b.date.localeCompare(a.date))[0].date
   }, [student])
+  const latestLarges = React.useMemo(() => {
+    if (!latestLargeDate) return []
+    return student.reviewLog.filter(x=> x.reviewType === "large" && x.date === latestLargeDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [student, latestLargeDate])
+  // توافق خلفي للإشارات القديمة
+  const latestMem = latestMems[0] || null
+  const latestSmall = latestSmalls[0] || null
+  const latestLarge = latestLarges[0] || null
 
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
   const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
@@ -2328,18 +2344,18 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   const [editForm, setEditForm] = React.useState<{surahNumber:number; fromAyah:number; toAyah:number; date:string; grade:Grade; notes:string}>({surahNumber:114, fromAyah:1, toAyah:6, date:todayISO(), grade:"بدون تقدير", notes:""})
   const [showPlanPage, setShowPlanPage] = React.useState(false)
 
-  // السجلات السابقة = كل السجلات ما عدا الأحدث لكل نوع
+  // السجلات السابقة = كل السجلات ما عدا تاريخ المطلوب غداً لكل نوع (إصلاح: كل السور بنفس التاريخ لا تذهب للسابق)
   const previousCombined = React.useMemo(() => {
     const list: Array<{ key: string; type: "mem"|"small"|"large"; date: string; sortKey: string }> = []
-    const memPrev = latestMem ? student.memorizationLog.filter(x=> x.id !== latestMem.id) : student.memorizationLog
-    const smallPrev = latestSmall ? student.reviewLog.filter(x=> x.id !== latestSmall.id && x.reviewType==="small") : student.reviewLog.filter(x=> x.reviewType==="small")
-    const largePrev = latestLarge ? student.reviewLog.filter(x=> x.id !== latestLarge.id && x.reviewType==="large") : student.reviewLog.filter(x=> x.reviewType==="large")
+    const memPrev = latestMemDate ? student.memorizationLog.filter(x=> x.date !== latestMemDate) : student.memorizationLog
+    const smallPrev = latestSmallDate ? student.reviewLog.filter(x=> !(x.reviewType==="small" && x.date === latestSmallDate)) : student.reviewLog.filter(x=> x.reviewType==="small")
+    const largePrev = latestLargeDate ? student.reviewLog.filter(x=> !(x.reviewType==="large" && x.date === latestLargeDate)) : student.reviewLog.filter(x=> x.reviewType==="large")
     memPrev.forEach(e=> list.push({ key: e.id, type: "mem", date: e.date, sortKey: e.date + e.id }))
     smallPrev.forEach(e=> list.push({ key: e.id, type: "small", date: e.date, sortKey: e.date + e.id }))
     largePrev.forEach(e=> list.push({ key: e.id, type: "large", date: e.date, sortKey: e.date + e.id }))
     // رتب تنازلياً حسب التاريخ
     return list.sort((a,b)=> b.sortKey.localeCompare(a.sortKey))
-  }, [student, latestMem, latestSmall, latestLarge])
+  }, [student, latestMemDate, latestSmallDate, latestLargeDate])
 
   const filteredPrev = React.useMemo(() => {
     if (historyFilter === "mem") return previousCombined.filter(x=> x.type==="mem")
@@ -2351,7 +2367,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   const memMap = React.useMemo(()=> new Map(student.memorizationLog.map(e=>[e.id, e])), [student])
   const reviewMap = React.useMemo(()=> new Map(student.reviewLog.map(e=>[e.id, e])), [student])
 
-  const hasAnyRequired = !!(latestMem || latestSmall || latestLarge)
+  const hasAnyRequired = !!(latestMems.length || latestSmalls.length || latestLarges.length)
 
   // ===== صفحة الخطة السنوية الكاملة (صفحة منفصلة) =====
   if (showPlanPage) {
@@ -2402,21 +2418,24 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
         <div className="grid md:grid-cols-3 gap-3">
           {/* حفظ جديد — لون موحد */}
-          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMem ? "#1F5E3A" : "#E1E5DA"}}>
-            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMem ? "#1F5E3A" : "#F3F4F6"}}>
-              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>حفظ جديد</p>
-              {latestMem && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestMem.ayahCount} آية</span>}
+          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMems.length ? "#1F5E3A" : "#E1E5DA"}}>
+            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMems.length ? "#1F5E3A" : "#F3F4F6"}}>
+              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMems.length ? "white" : "#6B7280"}}>حفظ جديد {latestMems.length>1 && <span className="bg-white text-[#1F5E3A] px-1.5 py-0.5 rounded-full text-[10px]">{latestMems.length} سور</span>}</p>
+              {latestMems.length>0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestMems.reduce((a,b)=>a+b.ayahCount,0)} آية • {formatWajh(latestMems.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0))}</span>}
             </div>
             <div className="p-3">
-              {latestMem ? (
-                <div>
-                  <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestMem.surahName}</p>
-                  <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestMem.fromAyah} إلى {latestMem.toAyah}</p>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestMem.grade]}}>{latestMem.grade}</span>
-                    <span className="text-[11px] text-gray-500">{fmtBoth(latestMem.date)}</span>
-                  </div>
-
+              {latestMems.length ? (
+                <div className="space-y-2">
+                  {latestMems.map(e=> (
+                    <div key={e.id} className="bg-[#FAF9F4] rounded-xl p-2.5 border border-[#E1E5DA]">
+                      <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {e.surahName}</p>
+                      <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {e.fromAyah} إلى {e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)}</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                        <span className="text-[11px] text-gray-500">{fmtBoth(e.date)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-4">
@@ -2428,21 +2447,24 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           </div>
 
           {/* مراجعة صغرى — لون موحد نفس النظام */}
-          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmall ? "#1F5E3A" : "#E1E5DA"}}>
-            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmall ? "#1F5E3A" : "#F3F4F6"}}>
-              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>مراجعة صغرى</p>
-              {latestSmall && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmall.ayahCount} آية</span>}
+          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmalls.length ? "#1F5E3A" : "#E1E5DA"}}>
+            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmalls.length ? "#1F5E3A" : "#F3F4F6"}}>
+              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmalls.length ? "white" : "#6B7280"}}>مراجعة صغرى {latestSmalls.length>1 && <span className="bg-white text-[#1F5E3A] px-1.5 py-0.5 rounded-full text-[10px]">{latestSmalls.length} سور</span>}</p>
+              {latestSmalls.length>0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmalls.reduce((a,b)=>a+b.ayahCount,0)} آية • {formatWajh(latestSmalls.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0))}</span>}
             </div>
             <div className="p-3">
-              {latestSmall ? (
-                <div>
-                  <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestSmall.surahName}</p>
-                  <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestSmall.fromAyah} إلى {latestSmall.toAyah}</p>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestSmall.grade]}}>{latestSmall.grade}</span>
-                    <span className="text-[11px] text-gray-500">{fmtBoth(latestSmall.date)}</span>
-                  </div>
-
+              {latestSmalls.length ? (
+                <div className="space-y-2">
+                  {latestSmalls.map(e=> (
+                    <div key={e.id} className="bg-[#FAF9F4] rounded-xl p-2.5 border border-[#E1E5DA]">
+                      <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {e.surahName}</p>
+                      <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {e.fromAyah} إلى {e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)}</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                        <span className="text-[11px] text-gray-500">{fmtBoth(e.date)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-4">
@@ -2454,21 +2476,24 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           </div>
 
           {/* مراجعة كبرى — لون موحد نفس النظام */}
-          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarge ? "#1F5E3A" : "#E1E5DA"}}>
-            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarge ? "#1F5E3A" : "#F3F4F6"}}>
-              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>مراجعة كبرى</p>
-              {latestLarge && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarge.ayahCount} آية</span>}
+          <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarges.length ? "#1F5E3A" : "#E1E5DA"}}>
+            <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarges.length ? "#1F5E3A" : "#F3F4F6"}}>
+              <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarges.length ? "white" : "#6B7280"}}>مراجعة كبرى {latestLarges.length>1 && <span className="bg-white text-[#1F5E3A] px-1.5 py-0.5 rounded-full text-[10px]">{latestLarges.length} سور</span>}</p>
+              {latestLarges.length>0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarges.reduce((a,b)=>a+b.ayahCount,0)} آية • {formatWajh(latestLarges.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0))}</span>}
             </div>
             <div className="p-3">
-              {latestLarge ? (
-                <div>
-                  <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestLarge.surahName}</p>
-                  <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestLarge.fromAyah} إلى {latestLarge.toAyah}</p>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestLarge.grade]}}>{latestLarge.grade}</span>
-                    <span className="text-[11px] text-gray-500">{fmtBoth(latestLarge.date)}</span>
-                  </div>
-
+              {latestLarges.length ? (
+                <div className="space-y-2">
+                  {latestLarges.map(e=> (
+                    <div key={e.id} className="bg-[#FAF9F4] rounded-xl p-2.5 border border-[#E1E5DA]">
+                      <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {e.surahName}</p>
+                      <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {e.fromAyah} إلى {e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)}</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                        <span className="text-[11px] text-gray-500">{fmtBoth(e.date)}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-4">
@@ -2797,30 +2822,46 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const [newGrade, setNewGrade] = React.useState<Grade>("ممتاز")
   const [editingEntry, setEditingEntry] = React.useState<{id:string; type:"mem"|"small"|"large"} | null>(null)
   const [editForm, setEditForm] = React.useState<{surahNumber:number; fromAyah:number; toAyah:number; date:string; grade:Grade; notes:string}>({surahNumber:114, fromAyah:1, toAyah:6, date:todayISO(), grade:"بدون تقدير", notes:""})
-  const latestMem = React.useMemo(() => {
+  const latestMemDate = React.useMemo(() => {
     if (!student.memorizationLog.length) return null
-    return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as MemorizationEntry
+    return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date))[0].date
   }, [student])
-  const latestSmall = React.useMemo(() => {
+  const latestMems = React.useMemo(() => {
+    if (!latestMemDate) return []
+    return student.memorizationLog.filter(x=> x.date === latestMemDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [student, latestMemDate])
+  const latestSmallDate = React.useMemo(() => {
     const arr = student.reviewLog.filter(x=> x.reviewType === "small")
     if (!arr.length) return null
-    return [...arr].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as ReviewEntry
+    return [...arr].sort((a,b)=> b.date.localeCompare(a.date))[0].date
   }, [student])
-  const latestLarge = React.useMemo(() => {
+  const latestSmalls = React.useMemo(() => {
+    if (!latestSmallDate) return []
+    return student.reviewLog.filter(x=> x.reviewType === "small" && x.date === latestSmallDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [student, latestSmallDate])
+  const latestLargeDate = React.useMemo(() => {
     const arr = student.reviewLog.filter(x=> x.reviewType === "large")
     if (!arr.length) return null
-    return [...arr].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as ReviewEntry
+    return [...arr].sort((a,b)=> b.date.localeCompare(a.date))[0].date
   }, [student])
+  const latestLarges = React.useMemo(() => {
+    if (!latestLargeDate) return []
+    return student.reviewLog.filter(x=> x.reviewType === "large" && x.date === latestLargeDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [student, latestLargeDate])
+  // توافق خلفي
+  const latestMem = latestMems[0] || null
+  const latestSmall = latestSmalls[0] || null
+  const latestLarge = latestLarges[0] || null
   const previousCombined = React.useMemo(() => {
     const list: Array<{ key: string; type: "mem"|"small"|"large"; date: string; sortKey: string }> = []
-    const memPrev = latestMem ? student.memorizationLog.filter(x=> x.id !== latestMem.id) : student.memorizationLog
-    const smallPrev = latestSmall ? student.reviewLog.filter(x=> x.id !== latestSmall.id && x.reviewType==="small") : student.reviewLog.filter(x=> x.reviewType==="small")
-    const largePrev = latestLarge ? student.reviewLog.filter(x=> x.id !== latestLarge.id && x.reviewType==="large") : student.reviewLog.filter(x=> x.reviewType==="large")
+    const memPrev = latestMemDate ? student.memorizationLog.filter(x=> x.date !== latestMemDate) : student.memorizationLog
+    const smallPrev = latestSmallDate ? student.reviewLog.filter(x=> !(x.reviewType==="small" && x.date === latestSmallDate)) : student.reviewLog.filter(x=> x.reviewType==="small")
+    const largePrev = latestLargeDate ? student.reviewLog.filter(x=> !(x.reviewType==="large" && x.date === latestLargeDate)) : student.reviewLog.filter(x=> x.reviewType==="large")
     memPrev.forEach(e=> list.push({ key: e.id, type: "mem", date: e.date, sortKey: e.date + e.id }))
     smallPrev.forEach(e=> list.push({ key: e.id, type: "small", date: e.date, sortKey: e.date + e.id }))
     largePrev.forEach(e=> list.push({ key: e.id, type: "large", date: e.date, sortKey: e.date + e.id }))
     return list.sort((a,b)=> b.sortKey.localeCompare(a.sortKey))
-  }, [student, latestMem, latestSmall, latestLarge])
+  }, [student, latestMemDate, latestSmallDate, latestLargeDate])
   const filteredPrev = React.useMemo(() => {
     if (historyFilter === "mem") return previousCombined.filter(x=> x.type==="mem")
     if (historyFilter === "review") return previousCombined.filter(x=> x.type!=="mem")
@@ -2828,7 +2869,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   }, [previousCombined, historyFilter])
   const memMap = React.useMemo(()=> new Map(student.memorizationLog.map(e=>[e.id, e] as const)), [student])
   const reviewMap = React.useMemo(()=> new Map(student.reviewLog.map(e=>[e.id, e] as const)), [student])
-  const hasAnyRequired = !!(latestMem || latestSmall || latestLarge)
+  const hasAnyRequired = !!(latestMems.length || latestSmalls.length || latestLarges.length)
 
   const copyLink = () => { navigator.clipboard.writeText(link); }
   return (
@@ -2889,26 +2930,30 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
           <div className="grid md:grid-cols-3 gap-3">
             {/* حفظ جديد */}
-            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMem ? "#1F5E3A" : "#E1E5DA"}}>
-              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMem ? "#1F5E3A" : "#F3F4F6"}}>
-                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>حفظ جديد</p>
-                {latestMem && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestMem.ayahCount} آية</span>}
+            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMems.length ? "#1F5E3A" : "#E1E5DA"}}>
+              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMems.length ? "#1F5E3A" : "#F3F4F6"}}>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMems.length ? "white" : "#6B7280"}}>حفظ جديد {latestMems.length>1 && <span className="bg-white text-[#1F5E3A] px-1.5 py-0.5 rounded-full text-[10px]">{latestMems.length} سور</span>}</p>
+                {latestMems.length>0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestMems.reduce((a,b)=>a+b.ayahCount,0)} آية • {formatWajh(latestMems.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0))}</span>}
               </div>
               <div className="p-3">
-                {latestMem ? (
-                  <div>
-                    <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestMem.surahName}</p>
-                    <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestMem.fromAyah} إلى {latestMem.toAyah}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestMem.grade]}}>{latestMem.grade}</span>
-                      <span className="text-[11px] text-gray-500">{fmtBoth(latestMem.date)}</span>
-                    </div>
-                    {!readOnly && (
-                      <div className="flex gap-1.5 mt-2">
-                        <button onClick={() => { setEditingEntry({id: latestMem.id, type:"mem"}); setEditForm({surahNumber: latestMem.surahNumber, fromAyah: latestMem.fromAyah, toAyah: latestMem.toAyah, date: latestMem.date, grade: latestMem.grade, notes: latestMem.notes||""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
-                        <button onClick={() => { if (confirm("حذف هذا الحفظ؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== latestMem.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                {latestMems.length ? (
+                  <div className="space-y-2">
+                    {latestMems.map(e=> (
+                      <div key={e.id} className="bg-[#FAF9F4] rounded-xl p-2.5 border border-[#E1E5DA]">
+                        <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {e.surahName}</p>
+                        <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {e.fromAyah} إلى {e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)}</p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                          <span className="text-[11px] text-gray-500">{fmtBoth(e.date)}</span>
+                        </div>
+                        {!readOnly && (
+                          <div className="flex gap-1.5 mt-2">
+                            <button onClick={() => { setEditingEntry({id: e.id, type:"mem"}); setEditForm({surahNumber: e.surahNumber, fromAyah: e.fromAyah, toAyah: e.toAyah, date: e.date, grade: e.grade, notes: e.notes||""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
+                            <button onClick={() => { if (confirm("حذف هذا الحفظ؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== e.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -2920,26 +2965,30 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             </div>
 
             {/* مراجعة صغرى */}
-            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmall ? "#1F5E3A" : "#E1E5DA"}}>
-              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmall ? "#1F5E3A" : "#F3F4F6"}}>
-                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>مراجعة صغرى</p>
-                {latestSmall && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmall.ayahCount} آية</span>}
+            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmalls.length ? "#1F5E3A" : "#E1E5DA"}}>
+              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmalls.length ? "#1F5E3A" : "#F3F4F6"}}>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmalls.length ? "white" : "#6B7280"}}>مراجعة صغرى {latestSmalls.length>1 && <span className="bg-white text-[#1F5E3A] px-1.5 py-0.5 rounded-full text-[10px]">{latestSmalls.length} سور</span>}</p>
+                {latestSmalls.length>0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmalls.reduce((a,b)=>a+b.ayahCount,0)} آية • {formatWajh(latestSmalls.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0))}</span>}
               </div>
               <div className="p-3">
-                {latestSmall ? (
-                  <div>
-                    <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestSmall.surahName}</p>
-                    <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestSmall.fromAyah} إلى {latestSmall.toAyah}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestSmall.grade]}}>{latestSmall.grade}</span>
-                      <span className="text-[11px] text-gray-500">{fmtBoth(latestSmall.date)}</span>
-                    </div>
-                    {!readOnly && (
-                      <div className="flex gap-1.5 mt-2">
-                        <button onClick={() => { setEditingEntry({id: latestSmall.id, type:"small"}); setEditForm({surahNumber: latestSmall.surahNumber, fromAyah: latestSmall.fromAyah, toAyah: latestSmall.toAyah, date: latestSmall.date, grade: latestSmall.grade, notes:""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
-                        <button onClick={() => { if (confirm("حذف هذه المراجعة الصغرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestSmall.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                {latestSmalls.length ? (
+                  <div className="space-y-2">
+                    {latestSmalls.map(e=> (
+                      <div key={e.id} className="bg-[#FAF9F4] rounded-xl p-2.5 border border-[#E1E5DA]">
+                        <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {e.surahName}</p>
+                        <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {e.fromAyah} إلى {e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)}</p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                          <span className="text-[11px] text-gray-500">{fmtBoth(e.date)}</span>
+                        </div>
+                        {!readOnly && (
+                          <div className="flex gap-1.5 mt-2">
+                            <button onClick={() => { setEditingEntry({id: e.id, type:"small"}); setEditForm({surahNumber: e.surahNumber, fromAyah: e.fromAyah, toAyah: e.toAyah, date: e.date, grade: e.grade, notes:""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
+                            <button onClick={() => { if (confirm("حذف هذه المراجعة الصغرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -2951,26 +3000,30 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             </div>
 
             {/* مراجعة كبرى */}
-            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarge ? "#1F5E3A" : "#E1E5DA"}}>
-              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarge ? "#1F5E3A" : "#F3F4F6"}}>
-                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>مراجعة كبرى</p>
-                {latestLarge && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarge.ayahCount} آية</span>}
+            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarges.length ? "#1F5E3A" : "#E1E5DA"}}>
+              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarges.length ? "#1F5E3A" : "#F3F4F6"}}>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarges.length ? "white" : "#6B7280"}}>مراجعة كبرى {latestLarges.length>1 && <span className="bg-white text-[#1F5E3A] px-1.5 py-0.5 rounded-full text-[10px]">{latestLarges.length} سور</span>}</p>
+                {latestLarges.length>0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarges.reduce((a,b)=>a+b.ayahCount,0)} آية • {formatWajh(latestLarges.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0))}</span>}
               </div>
               <div className="p-3">
-                {latestLarge ? (
-                  <div>
-                    <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestLarge.surahName}</p>
-                    <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestLarge.fromAyah} إلى {latestLarge.toAyah}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestLarge.grade]}}>{latestLarge.grade}</span>
-                      <span className="text-[11px] text-gray-500">{fmtBoth(latestLarge.date)}</span>
-                    </div>
-                    {!readOnly && (
-                      <div className="flex gap-1.5 mt-2">
-                        <button onClick={() => { setEditingEntry({id: latestLarge.id, type:"large"}); setEditForm({surahNumber: latestLarge.surahNumber, fromAyah: latestLarge.fromAyah, toAyah: latestLarge.toAyah, date: latestLarge.date, grade: latestLarge.grade, notes:""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
-                        <button onClick={() => { if (confirm("حذف هذه المراجعة الكبرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestLarge.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                {latestLarges.length ? (
+                  <div className="space-y-2">
+                    {latestLarges.map(e=> (
+                      <div key={e.id} className="bg-[#FAF9F4] rounded-xl p-2.5 border border-[#E1E5DA]">
+                        <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {e.surahName}</p>
+                        <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {e.fromAyah} إلى {e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)}</p>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                          <span className="text-[11px] text-gray-500">{fmtBoth(e.date)}</span>
+                        </div>
+                        {!readOnly && (
+                          <div className="flex gap-1.5 mt-2">
+                            <button onClick={() => { setEditingEntry({id: e.id, type:"large"}); setEditForm({surahNumber: e.surahNumber, fromAyah: e.fromAyah, toAyah: e.toAyah, date: e.date, grade: e.grade, notes:""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
+                            <button onClick={() => { if (confirm("حذف هذه المراجعة الكبرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
                 ) : (
                   <div className="text-center py-4">
