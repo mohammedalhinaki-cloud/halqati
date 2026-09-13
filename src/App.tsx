@@ -289,14 +289,11 @@ function WeeklyCalendar({ plan }: { plan: AcademicPlan }) {
       <div className="space-y-3">
         {weeks.map(w => (
           <div key={w.weekNumber} className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-            <div className="px-4 py-3 bg-[#FAF9F4]/80 border-b flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-black text-sm flex items-center gap-2" style={{ color: "#163F27" }}><span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white" style={{ background: "#1F5E3A" }}>{w.weekNumber}</span> الأسبوع {w.weekNumber === 1 ? "الأول" : w.weekNumber === 2 ? "الثاني" : w.weekNumber === 3 ? "الثالث" : `رقم ${w.weekNumber}`}</h3>
-              <span className="text-[11px] font-bold text-gray-600 bg-white border px-2.5 py-1 rounded-full">{fmtBoth(w.start)} — {fmtBoth(w.end)}</span>
+            <div className="px-4 py-3 bg-[#FAF9F4]/80 border-b text-center">
+              <h3 className="font-black text-sm flex items-center justify-center gap-2" style={{ color: "#163F27" }}><span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0" style={{ background: "#1F5E3A" }}>{w.weekNumber}</span> الأسبوع رقم {w.weekNumber}</h3>
+              <p className="text-[11px] font-bold text-gray-600 mt-1.5 leading-5">{fmtBoth(w.start)} → {fmtBoth(w.end)}</p>
             </div>
             <div className="p-2 md:p-3">
-              <div className="grid grid-cols-7 gap-1 mb-1">
-                {WEEKDAYS.map((d, i) => <div key={i} className="text-center text-[10px] font-black text-gray-500 py-1">{d}</div>)}
-              </div>
               <div className="grid grid-cols-7 gap-1 md:gap-1.5">
                 {w.days.map((iso, idx) => {
                   if (!iso) {
