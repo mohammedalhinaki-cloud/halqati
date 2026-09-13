@@ -76,6 +76,36 @@ const SURAHS: { number: number; name: string; ayahCount: number }[] = [
   [111, "المسد", 5], [112, "الإخلاص", 4], [113, "الفلق", 5], [114, "الناس", 6],
 ].map(([n, name, ayah]) => ({ number: Number(n), name: String(name), ayahCount: Number(ayah) }))
 
+// ===== حساب الأوجه بدقة بصفحات المصحف (604 صفحات) — كل وجه = صفحة مطبوعة =====
+const PAGE_STARTS: number[] = [1,8,13,24,32,37,45,56,65,69,77,84,91,96,101,109,113,120,127,134,142,149,153,161,171,177,184,189,194,198,204,210,218,223,227,232,238,241,245,253,256,260,264,267,272,277,282,289,290,294,303,309,316,323,331,339,346,355,364,371,377,385,394,402,409,415,426,434,442,447,451,459,467,474,480,488,494,500,505,508,513,517,520,527,531,538,545,553,559,568,573,580,585,588,595,599,607,615,621,628,634,641,648,656,664,669,672,675,679,683,687,693,701,706,711,715,720,727,734,740,746,752,759,765,773,778,783,790,798,808,817,825,834,842,849,858,863,871,880,884,891,900,908,914,921,927,932,936,941,947,955,966,977,985,992,998,1006,1012,1022,1028,1036,1042,1050,1059,1075,1085,1092,1098,1104,1110,1114,1118,1125,1133,1142,1150,1161,1169,1177,1186,1194,1201,1206,1213,1222,1230,1236,1242,1249,1256,1262,1267,1272,1276,1283,1290,1297,1304,1308,1315,1322,1329,1335,1342,1347,1353,1358,1365,1371,1379,1385,1390,1398,1407,1418,1426,1435,1443,1453,1462,1471,1479,1486,1493,1502,1511,1519,1527,1536,1545,1555,1562,1571,1582,1591,1601,1611,1619,1627,1634,1640,1649,1660,1666,1675,1683,1692,1700,1708,1713,1721,1726,1736,1742,1750,1756,1761,1769,1775,1784,1793,1803,1818,1834,1854,1873,1893,1908,1916,1928,1936,1944,1956,1966,1974,1981,1989,1995,2004,2012,2020,2030,2037,2047,2057,2068,2079,2088,2096,2105,2116,2126,2134,2145,2156,2161,2168,2175,2186,2194,2202,2215,2224,2238,2251,2262,2276,2289,2302,2315,2327,2346,2361,2386,2400,2413,2425,2436,2447,2462,2474,2484,2494,2508,2519,2528,2541,2556,2565,2574,2585,2596,2601,2611,2619,2626,2634,2642,2651,2660,2668,2674,2691,2701,2716,2733,2748,2763,2778,2792,2802,2812,2819,2823,2828,2835,2845,2850,2853,2858,2867,2876,2888,2899,2911,2923,2933,2952,2972,2993,3016,3044,3069,3092,3116,3139,3160,3173,3182,3195,3204,3215,3223,3236,3248,3258,3266,3274,3281,3288,3296,3303,3312,3323,3330,3337,3347,3355,3364,3371,3379,3386,3393,3404,3415,3425,3434,3442,3451,3460,3470,3481,3489,3498,3504,3515,3524,3534,3540,3549,3556,3564,3569,3577,3584,3588,3596,3607,3614,3621,3629,3638,3646,3655,3664,3672,3679,3691,3699,3705,3718,3733,3746,3760,3776,3789,3813,3840,3865,3891,3915,3942,3971,3987,3997,4013,4032,4054,4064,4069,4080,4090,4099,4106,4115,4126,4133,4141,4150,4159,4167,4174,4183,4192,4200,4211,4219,4230,4239,4248,4257,4265,4273,4283,4288,4295,4304,4317,4324,4336,4348,4359,4373,4386,4399,4415,4433,4454,4474,4487,4496,4506,4516,4525,4531,4539,4546,4557,4565,4575,4584,4593,4599,4607,4612,4617,4624,4631,4646,4666,4682,4706,4727,4750,4767,4785,4811,4829,4853,4874,4896,4918,4942,4969,4996,5030,5056,5079,5087,5094,5100,5105,5111,5116,5126,5130,5136,5143,5151,5156,5162,5169,5178,5186,5193,5200,5209,5218,5223,5230,5237,5242,5254,5268,5287,5314,5332,5358,5386,5415,5430,5448,5461,5476,5495,5513,5543,5571,5597,5617,5642,5673,5703,5728,5759,5801,5830,5855,5883,5910,5932,5964,5994,6017,6044,6073,6099,6126,6138,6156,6177,6194,6208,6222]
+const globalAyahNumber = (surahNum: number, ayahNum: number): number => {
+  let sum = 0
+  for (let i = 0; i < surahNum - 1; i++) sum += SURAHS[i].ayahCount
+  return sum + ayahNum
+}
+const pageForGlobalAyah = (global: number): number => {
+  let lo = 0, hi = PAGE_STARTS.length - 1, ans = 1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (PAGE_STARTS[mid] <= global) { ans = mid + 1; lo = mid + 1 } else hi = mid - 1
+  }
+  return ans
+}
+const pageForAyah = (surahNum: number, ayahNum: number): number => pageForGlobalAyah(globalAyahNumber(surahNum, ayahNum))
+const calcWajh = (surahNum: number, fromAyah: number, toAyah: number): number => {
+  if (fromAyah < 1) fromAyah = 1
+  if (toAyah < fromAyah) return 1
+  const s = SURAHS.find(x=>x.number===surahNum)
+  if (!s) return Math.max(1, toAyah - fromAyah + 1)
+  const clampedFrom = Math.max(1, Math.min(fromAyah, s.ayahCount))
+  const clampedTo = Math.max(1, Math.min(toAyah, s.ayahCount))
+  if (clampedFrom > clampedTo) return 1
+  const p1 = pageForAyah(surahNum, clampedFrom)
+  const p2 = pageForAyah(surahNum, clampedTo)
+  return Math.max(1, p2 - p1 + 1)
+}
+const calcWajhForRange = (surahNum: number, fromAyah: number, toAyah: number): number => calcWajh(surahNum, fromAyah, toAyah)
+
 const GRADES: Grade[] = ["بدون تقدير", "ممتاز", "جيد جداً", "جيد", "يحتاج إعادة"]
 const GRADE_COLOR: Record<string, string> = { "ممتاز": "#1F5E3A", "جيد": "#C9A227", "جيد جداً": "#3F8F5F", "جيد جدًا": "#3F8F5F", "يحتاج إعادة": "#B3492C", "بدون تقدير": "#9CA3AF" }
 // === Helpers — نظام التقدير الرقمي 0-3 (مواصفة الاستمارات) ===
@@ -295,6 +325,9 @@ const getNextRecitationISO = (fromISO: string, plan: AcademicPlan): string => {
   return addDaysISO(fromISO, 1)
 }
 const ensureRecitationDate = (iso: string, plan: AcademicPlan): string => {
+  // يطبق نظام اليوم المسبوق فقط إذا كان المعلم اختار تاريخ اليوم الفعلي — أما التواريخ الأقدم فتُحفظ كما هي بدون نقل
+  const today = todayISO()
+  if (iso !== today) return iso
   if (getDayType(iso, plan).type === "recitation") return iso
   for (let off = 1; off <= 60; off++) {
     const cand = addDaysISO(iso, off)
@@ -422,6 +455,74 @@ function WeeklyCalendar({ plan }: { plan: AcademicPlan }) {
   )
 }
 
+
+function AttendanceReportView({ students, circles, attendance, date, onClose }: { students: Student[]; circles: Circle[]; attendance: AttendanceRecord[]; date: string; onClose: ()=>void }) {
+  const grouped = React.useMemo(()=>{
+    const byCircle = new Map<string, {circle: Circle | null, items: Array<{student: Student, status: AttendanceStatus | null, note?:string}>}>()
+    // Sort circles by name
+    const sortedCircles = [...circles].sort((a,b)=> a.name.localeCompare(b.name, "ar"))
+    // Add groups for each circle
+    for(const c of sortedCircles){
+      byCircle.set(c.id, {circle: c, items: []})
+    }
+    byCircle.set("__none", {circle: null, items: []})
+    for(const s of [...students].sort((a,b)=> a.name.localeCompare(b.name,"ar"))){
+      const rec = attendance.find(a=> a.studentId===s.id && a.date===date)
+      const cid = s.circleId || "__none"
+      if(!byCircle.has(cid)) byCircle.set(cid, {circle: circles.find(c=>c.id===cid)||null, items:[]})
+      byCircle.get(cid)!.items.push({student: s, status: rec?.status || null, note: rec?.note})
+    }
+    return Array.from(byCircle.entries()).filter(([_,g])=> g.items.length>0).sort((a,b)=>{
+      if(a[0]==="__none") return 1
+      if(b[0]==="__none") return -1
+      return (a[1].circle?.name||"").localeCompare(b[1].circle?.name||"", "ar")
+    })
+  }, [students, circles, attendance, date])
+  const total = students.length
+  const marked = attendance.filter(a=> a.date===date && students.some(s=> s.id===a.studentId)).length
+  return (
+    <div className="space-y-4">
+      <button onClick={onClose} className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-[#FAF9F4] transition"><span>→</span> رجوع</button>
+      <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b bg-[#FAF9F4]/60">
+          <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📋 سجل التحضير — مرتب حسب الحلقات</h2>
+          <p className="text-xs text-gray-500 mt-1">التاريخ: {fmtBoth(date)} • تم تحضير {marked} من {total} طالب • يتجدد تلقائياً عند كل تحضير</p>
+        </div>
+        <div className="p-4 space-y-4">
+          {grouped.map(([cid, group])=>{
+            const cname = group.circle ? group.circle.name : "بدون حلقة"
+            const present = group.items.filter(x=> x.status==="حاضر").length
+            return (
+              <div key={cid} className="border rounded-xl overflow-hidden">
+                <div className="px-4 py-2 bg-[#1F5E3A] text-white flex items-center justify-between">
+                  <span className="font-bold text-sm">📚 {cname}</span>
+                  <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{group.items.length} طلاب • {present} حاضر</span>
+                </div>
+                <div className="divide-y">
+                  {group.items.map(({student, status, note})=> (
+                    <div key={student.id} className="flex items-center justify-between p-3 hover:bg-[#FAF9F4] transition">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-white text-xs`} style={{background: status ? ATTENDANCE_COLOR[status] : "#9CA3AF"}}>{student.name.trim().charAt(0)}</div>
+                        <div>
+                          <p className="font-bold text-xs" style={{color:"#163F27"}}>{student.name}</p>
+                          <p className="text-[11px] text-gray-500">{status ? `الحالة: ${status}` : "لم يُحضّر بعد"} {note ? `• ${note}` : ""}</p>
+                        </div>
+                      </div>
+                      {status ? <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${ATTENDANCE_BG[status]}`}>{status}</span> : <span className="px-2.5 py-1 rounded-full text-[11px] font-bold border bg-gray-50 text-gray-400">لم يُحضّر</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+          {grouped.length===0 && <p className="text-center text-xs text-gray-400 py-8">لا يوجد طلاب</p>}
+        </div>
+      </div>
+      <button onClick={onClose} className="w-full py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm transition">العودة</button>
+    </div>
+  )
+}
+
 // ===================== App =====================
 export default function App() {
   // Data
@@ -435,6 +536,7 @@ export default function App() {
   const [announcementText, setAnnouncementText] = useState("")
   const [attendanceDate, setAttendanceDate] = useState<string>(todayISO())
   const [attendanceNote, setAttendanceNote] = useState<Record<string,string>>({})
+  const [showAttendanceReport, setShowAttendanceReport] = useState(false)
   const [supervisorCircle, setSupervisorCircle] = useState<string>("all")
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => localStorage.getItem("halqati_session"))
   const [toast, setToast] = useState<string | null>(null)
@@ -1214,7 +1316,13 @@ export default function App() {
         </div>
       </header>
 
-      {currentUser.role === "supervisor" ? (
+      {/* صفحة سجل التحضير المرتب حسب الحلقات — تظهر بعد الضغط على الزر وتتجدد تلقائياً */}
+      {showAttendanceReport && (
+        <div className="max-w-[900px] w-full mx-auto px-4 py-6 flex-1">
+          <AttendanceReportView students={currentUser.role === "supervisor" ? supervisorStudents : visibleStudents} circles={circles} attendance={attendance} date={attendanceDate} onClose={()=> setShowAttendanceReport(false)} />
+        </div>
+      )}
+      {!showAttendanceReport && currentUser.role === "supervisor" ? (
         /* ===== Supervisor dedicated attendance view - بسيطة ومخصصة للتحضير فقط ===== */
         <main className="flex-1 max-w-[900px] w-full mx-auto px-4 py-6">
           {/* Welcome Card */}
@@ -1313,9 +1421,10 @@ export default function App() {
                 })}
             </div>
           </div>
+          <button onClick={()=> setShowAttendanceReport(true)} className="w-full mt-4 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2">📋 عرض سجل التحضير المرتب حسب الحلقات — يتجدد تلقائياً <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{supervisorStats.total}/{supervisorStudents.length}</span></button>
           <p className="text-center text-[11px] text-gray-400 mt-4">💡 التحضير يُحفظ تلقائياً • يمكنك تعديل أي حالة في أي وقت بالضغط عليها • التاريخ: {fmtBoth(attendanceDate)}</p>
         </main>
-      ) : (
+      ) : !showAttendanceReport ? (
       <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 py-5">
         {(currentUser?.role === "teacher" || currentUser?.role === "admin") && showTeacherPlan ? (
           <div className="space-y-4">
@@ -1557,6 +1666,10 @@ export default function App() {
                 })
               }
             </div>
+            <div className="px-4 py-3 bg-white border-t flex gap-2">
+              <button onClick={()=> setShowAttendanceReport(true)} className="flex-1 py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-xs flex items-center justify-center gap-2">📋 عرض السجل المرتب حسب الحلقات <span className="bg-white/20 px-2 py-0.5 rounded-full">{attendanceStatsForDate.total}/{visibleStudents.length}</span></button>
+              <span className="hidden sm:inline-flex items-center text-[11px] text-gray-500">يتجدد عند كل تحضير</span>
+            </div>
             <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 text-[11px] text-amber-800 text-center">💡 التحضير يُحفظ تلقائياً في المتصفح و Supabase (إذا كان الربط مفعّلاً من قبل المالك) • التاريخ: {fmtBoth(attendanceDate)}</div>
           </div>
         )}
@@ -1578,7 +1691,7 @@ export default function App() {
             {visibleStudents.map(s => {
               const circleName2 = circles.find(c => c.id === s.circleId)?.name || "بدون حلقة"
               const lastGrade = s.memorizationLog[0]?.grade
-              const totalAyahs = s.memorizationLog.reduce((a, b) => a + b.ayahCount, 0)
+              const totalAyahs = s.memorizationLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
               return (
                 <div key={s.id} onClick={() => setSelectedStudentId(s.id)} className="bg-white rounded-2xl border border-[#E1E5DA] p-4 shadow-sm hover:shadow-md hover:border-[#1F5E3A]/20 cursor-pointer transition group">
                   <div className="flex items-start justify-between mb-3">
@@ -1601,7 +1714,7 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-gray-500 mb-3">
-                    <span>آيات محفوظة: <b style={{ color: "#1F5E3A" }}>{totalAyahs}</b></span>
+                    <span>أوجه محفوظة: <b style={{ color: "#1F5E3A" }}>{totalAyahs}</b></span>
                     <span>الحفظ القادم: {s.memorizationLog[0] ? `${s.memorizationLog[0].surahName} ${s.memorizationLog[0].toAyah + 1}` : "—"}</span>
                   </div>
 
@@ -1618,7 +1731,7 @@ export default function App() {
           </>
         )}
       </main>
-      )}
+      ) : null}
 
       <Footer />
 
@@ -2011,8 +2124,8 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
 
 function ParentTokenView({ student, circles, staff, attendance, plan }: { student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; plan: AcademicPlan }) {
   const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
-  const totalAyah = student.memorizationLog.reduce((a,b)=>a+b.ayahCount,0)
-  const totalReview = student.reviewLog.reduce((a,b)=>a+b.ayahCount,0)
+  const totalAyah = student.memorizationLog.reduce((a,b)=>a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
+  const totalReview = student.reviewLog.reduce((a,b)=>a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x=>x.grade==="ممتاز").length / student.memorizationLog.length * 100) : 0
 
   // آخر سجل  (حسب اختيار المستخدم)
@@ -2199,8 +2312,8 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
         {/* إحصائيات سريعة + زر الخطة السنوية بجانبها */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-          <MiniStat label="مقدار الحفظ" value={totalAyah + " آية"} />
-          <MiniStat label="مقدار المراجعة" value={totalReview + " آية"} />
+          <MiniStat label="مقدار الحفظ" value={totalAyah + " وجه"} />
+          <MiniStat label="مقدار المراجعة" value={totalReview + " وجه"} />
           <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
           <MiniStat label="عدد الملاحظات" value={String(student.notes.length)} />
           <button onClick={()=> setShowPlanPage(true)} className="bg-white rounded-xl border-2 border-[#1F5E3A]/20 hover:border-[#1F5E3A] hover:bg-[#E7EFE7]/50 p-3 text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
@@ -2242,7 +2355,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
+                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -2258,7 +2371,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
+                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -2307,62 +2420,73 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
 
 
-// QuickTrackingEntry component code to be inserted
+// QuickTrackingEntry — نسخة متعددة السور + حساب أوجه دقيق
 function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, onToast }: { student: Student; currentUserId: string; plan: AcademicPlan; readOnly?: boolean; onUpdate: (s: Student) => void; onToast: (m: string)=>void }) {
   const [tab, setTab] = React.useState<"mem"|"kubra"|"sughra">("mem")
   const [showSettings, setShowSettings] = React.useState(false)
   const [date, setDate] = React.useState(todayISO())
-  const [surahNum, setSurahNum] = React.useState(114)
-  const [fromAyah, setFromAyah] = React.useState(1)
-  const [toAyah, setToAyah] = React.useState(6)
   const [gradeNum, setGradeNum] = React.useState<number>(3)
   const [lahnNum, setLahnNum] = React.useState<number>(3)
   const [notes, setNotes] = React.useState("")
-  const [surahSearch, setSurahSearch] = React.useState("")
-  const faces = calcFaces(fromAyah, toAyah)
+  const [rows, setRows] = React.useState<Array<{id:string, surahNum:number, fromAyah:number, toAyah:number, search:string}>>([{id:uid(), surahNum:114, fromAyah:1, toAyah:6, search:""}])
+
   const dayName = getDayNameFromISO(date)
-  const surah = SURAHS.find(s=>s.number===surahNum)!
-  const filteredSuras = React.useMemo(()=>{
-    const q = surahSearch.trim()
-    if(!q) return SURAHS
-    return SURAHS.filter(s=> s.name.includes(q) || String(s.number).includes(q))
-  },[surahSearch])
-  React.useEffect(()=>{
-    const s = SURAHS.find(x=>x.number===surahNum)
-    if(s){
-      if(fromAyah<1) setFromAyah(1)
-      if(toAyah> s.ayahCount) setToAyah(s.ayahCount)
-      if(fromAyah> s.ayahCount) setFromAyah(1)
-    }
-  },[surahNum])
+  const totalWajh = rows.reduce((a,r)=> a + calcWajh(r.surahNum, r.fromAyah, r.toAyah), 0)
+
+  const updateRow = (id:string, patch: Partial<{surahNum:number, fromAyah:number, toAyah:number, search:string}>) => {
+    setRows(prev=> prev.map(r=> r.id===id ? {...r, ...patch} : r))
+  }
+  const addRow = () => {
+    setRows(prev=> [...prev, {id:uid(), surahNum:114, fromAyah:1, toAyah:6, search:""}])
+  }
+  const removeRow = (id:string) => {
+    if(rows.length<=1) return
+    setRows(prev=> prev.filter(r=> r.id!==id))
+  }
+
   const handleSave = ()=>{
-    if(fromAyah<1 || toAyah> surah.ayahCount || fromAyah> toAyah){ onToast("تحقق من رقم الآيات"); return }
+    // تحقق كل الصفوف
+    for(const r of rows){
+      const s = SURAHS.find(x=>x.number===r.surahNum)!
+      if(r.fromAyah<1 || r.toAyah> s.ayahCount || r.fromAyah> r.toAyah){ onToast("تحقق من رقم الآيات في سورة "+s.name); return }
+    }
     const effDate = ensureRecitationDate(date, plan)
     const gradeLabel = GRADE_NUM_TO_LABEL[gradeNum] as Grade
+    const newMems: MemorizationEntry[] = []
+    const newReviews: ReviewEntry[] = []
+    for(const r of rows){
+      const surah = SURAHS.find(x=>x.number===r.surahNum)!
+      const w = calcWajh(r.surahNum, r.fromAyah, r.toAyah)
+      if(tab==="mem"){
+        newMems.push({ id: uid(), date: effDate, surahNumber: surah.number, surahName: surah.name, fromAyah: r.fromAyah, toAyah: r.toAyah, ayahCount: r.toAyah - r.fromAyah + 1, grade: gradeLabel, teacherId: currentUserId, notes: notes || undefined })
+      } else {
+        const rt: ReviewType = tab==="kubra" ? "large" : "small"
+        newReviews.push({ id: uid(), date: effDate, reviewType: rt, surahNumber: surah.number, surahName: surah.name, fromAyah: r.fromAyah, toAyah: r.toAyah, ayahCount: r.toAyah - r.fromAyah + 1, grade: gradeLabel, teacherId: currentUserId })
+      }
+    }
     if(tab==="mem"){
-      const entry: MemorizationEntry = { id: uid(), date: effDate, surahNumber: surah.number, surahName: surah.name, fromAyah, toAyah, ayahCount: faces, grade: gradeLabel, teacherId: currentUserId, notes: notes || undefined }
-      onUpdate({ ...student, memorizationLog: [entry, ...student.memorizationLog] })
-      onToast(effDate!==date ? `تم حفظ الحفظ ليوم ${fmtBoth(effDate)} ✓ (نُقل من إجازة)` : `تم حفظ الحفظ ✓ ${surah.name} ${fromAyah}-${toAyah} (${faces} وجه)`)
+      onUpdate({ ...student, memorizationLog: [...newMems, ...student.memorizationLog] })
+      onToast(effDate!==date ? `تم حفظ ${rows.length} سورة ليوم ${fmtBoth(effDate)} ✓ (نُقل من إجازة) — ${totalWajh} وجه` : `تم حفظ ${rows.length} سور ✓ ${totalWajh} وجه`)
     } else {
-      const rt: ReviewType = tab==="kubra" ? "large" : "small"
-      const entry: ReviewEntry = { id: uid(), date: effDate, reviewType: rt, surahNumber: surah.number, surahName: surah.name, fromAyah, toAyah, ayahCount: faces, grade: gradeLabel, teacherId: currentUserId }
-      onUpdate({ ...student, reviewLog: [entry, ...student.reviewLog] })
-      onToast(effDate!==date ? `تم حفظ ${tab==="kubra"?"الكبرى":"الصغرى"} ليوم ${fmtBoth(effDate)} ✓` : `تم حفظ ${tab==="kubra"?"الكبرى":"الصغرى"} ✓`)
+      onUpdate({ ...student, reviewLog: [...newReviews, ...student.reviewLog] })
+      onToast(effDate!==date ? `تم حفظ ${tab==="kubra"?"الكبرى":"الصغرى"} (${rows.length} سور) ليوم ${fmtBoth(effDate)} ✓` : `تم حفظ ${tab==="kubra"?"الكبرى":"الصغرى"} (${rows.length} سور) ✓ — ${totalWajh} وجه`)
     }
     setNotes("")
   }
+
   const periodStats = React.useMemo(()=>{
-    const totalMem = student.memorizationLog.reduce((a,b)=> a+b.ayahCount,0)
-    const totalKubra = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+b.ayahCount,0)
-    const totalSughra = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+b.ayahCount,0)
+    const totalMem = student.memorizationLog.reduce((a,b)=> a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
+    const totalKubra = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
+    const totalSughra = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
     const requiredMem = student.targetFacesWeekly ? student.targetFacesWeekly * 4 : 0
     const requiredKubra = student.dailyMinKubraFaces ? student.dailyMinKubraFaces * 28 : 0
     return { totalMem, totalKubra, totalSughra, requiredMem, requiredKubra }
   },[student])
+
   return (
     <div className="bg-white rounded-2xl border p-4 shadow-sm">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-        <h4 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>📋 الإدخال السريع — أسهل من الورق <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">ضغطات فقط</span></h4>
+        <h4 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>📋 الإدخال السريع — أسهل من الورق <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">ضغطات فقط • متعدد السور</span></h4>
         <button onClick={()=> setShowSettings(v=>!v)} className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-[#FAF9F4] border border-[#E1E5DA] text-[#5B6459] hover:bg-white">{showSettings?"إخفاء الإعدادات":"⚙️ إعدادات الطالب (مرة واحدة)"}</button>
       </div>
       {showSettings && (
@@ -2394,33 +2518,57 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
         <div className="grid grid-cols-2 gap-3">
           <div><label className="text-[11px] font-bold text-gray-700">التاريخ <span className="text-gray-400 font-normal">(تلقائي)</span></label>
             <input type="date" value={date} onChange={e=> setDate(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm bg-white" />
-            <p className="text-[11px] text-[#1F5E3A] font-bold mt-1">{dayName} • {fmtBoth(date)} {getDayType(date, plan).type!=="recitation" && <span className="text-amber-700">→ سيُنقل إلى {fmtBoth(ensureRecitationDate(date, plan))}</span>}</p></div>
-          <div><label className="text-[11px] font-bold text-gray-700">عدد الأوجه <span className="text-gray-400 font-normal">(يُحسب تلقائياً)</span></label>
-            <div className="mt-1 px-3 py-2.5 rounded-xl border bg-[#E7EFE7] border-[#A5D6A7] text-center"><span className="font-black text-lg" style={{color:"#1F5E3A"}}>{faces}</span> <span className="text-xs font-bold text-[#1F5E3A]">وجه</span> <span className="text-[11px] text-gray-500">({fromAyah} → {toAyah})</span></div></div>
+            <p className="text-[11px] text-[#1F5E3A] font-bold mt-1">{dayName} • {fmtBoth(date)} {getDayType(date, plan).type!=="recitation" && date===todayISO() && <span className="text-amber-700">→ سيُنقل إلى {fmtBoth(ensureRecitationDate(date, plan))}</span>}{getDayType(date, plan).type!=="recitation" && date!==todayISO() && <span className="text-gray-500">• يُحفظ في نفس التاريخ (ليس اليوم)</span>}</p></div>
+          <div><label className="text-[11px] font-bold text-gray-700">إجمالي الأوجه (دقيق بصفحات المصحف)</label>
+            <div className="mt-1 px-3 py-2.5 rounded-xl border bg-[#E7EFE7] border-[#A5D6A7] text-center"><span className="font-black text-lg" style={{color:"#1F5E3A"}}>{totalWajh}</span> <span className="text-xs font-bold text-[#1F5E3A]">وجه</span> <span className="text-[11px] text-gray-500">({rows.length} سور)</span></div></div>
         </div>
-        <div><label className="text-[11px] font-bold text-gray-700">السورة — قائمة منسدلة قابلة للبحث (١١٤ سورة)</label>
-          <div className="relative mt-1">
-            <input value={surahSearch} onChange={e=> setSurahSearch(e.target.value)} placeholder="ابحث بالاسم أو الرقم..." className="w-full px-3 py-2.5 rounded-xl border text-sm pr-9 bg-white" />
-            <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
+
+        {/* صفوف السور المتعددة */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-bold">السور — يمكنك إضافة أكثر من سورة في تسجيل واحد</label>
+            <button type="button" onClick={addRow} className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-[#1F5E3A] text-white hover:bg-[#163F27]">+ إضافة سورة أخرى</button>
           </div>
-          <select value={surahNum} onChange={e=> setSurahNum(Number(e.target.value))} className="w-full mt-2 px-3 py-2.5 rounded-xl border bg-white text-sm max-h-[180px]">
-            {filteredSuras.map(s=> <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
-          </select>
-          <p className="text-[11px] text-gray-500 mt-1">المختارة: <b style={{color:"#1F5E3A"}}>{surah.name} — {surah.ayahCount} آية</b> • اكتب في البحث للوصول أسرع</p></div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-[11px] font-bold">من (آية)</label>
-            <div className="flex items-center gap-1 mt-1">
-              <button type="button" onClick={()=> setFromAyah(v=> Math.max(1, v-1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">−</button>
-              <input type="number" value={fromAyah} onChange={e=> setFromAyah(Number(e.target.value)||1)} className="flex-1 px-3 py-2.5 rounded-xl border text-center font-black text-sm" />
-              <button type="button" onClick={()=> setFromAyah(v=> Math.min(surah.ayahCount, v+1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">+</button>
-            </div></div>
-          <div><label className="text-[11px] font-bold">إلى (آية)</label>
-            <div className="flex items-center gap-1 mt-1">
-              <button type="button" onClick={()=> setToAyah(v=> Math.max(fromAyah, v-1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">−</button>
-              <input type="number" value={toAyah} onChange={e=> setToAyah(Number(e.target.value)||1)} className="flex-1 px-3 py-2.5 rounded-xl border text-center font-black text-sm" />
-              <button type="button" onClick={()=> setToAyah(v=> Math.min(surah.ayahCount, v+1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">+</button>
-            </div></div>
+          {rows.map((r, idx)=>{
+            const surah = SURAHS.find(s=>s.number===r.surahNum)!
+            const filtered = r.search.trim() ? SURAHS.filter(s=> s.name.includes(r.search.trim()) || String(s.number).includes(r.search.trim())) : SURAHS
+            const w = calcWajh(r.surahNum, r.fromAyah, r.toAyah)
+            return (
+              <div key={r.id} className="bg-[#FAF9F4] rounded-xl border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black px-2 py-1 rounded-full bg-[#1F5E3A] text-white">سورة {idx+1}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-white border text-[#1F5E3A]">{w} وجه</span>
+                    {rows.length>1 && <button type="button" onClick={()=> removeRow(r.id)} className="text-[11px] font-bold px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 hover:bg-red-100">حذف</button>}
+                  </div>
+                </div>
+                <div className="relative">
+                  <input value={r.search} onChange={e=> updateRow(r.id,{search:e.target.value})} placeholder="ابحث بالاسم أو الرقم..." className="w-full px-3 py-2 rounded-xl border text-sm pr-9 bg-white" />
+                  <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
+                </div>
+                <select value={r.surahNum} onChange={e=> { const n=Number(e.target.value); const s=SURAHS.find(x=>x.number===n)!; updateRow(r.id,{surahNum:n, fromAyah:1, toAyah: Math.min(r.toAyah, s.ayahCount)}) }} className="w-full px-3 py-2.5 rounded-xl border bg-white text-sm">
+                  {filtered.map(s=> <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
+                </select>
+                <p className="text-[11px] text-gray-500">المختارة: <b style={{color:"#1F5E3A"}}>{surah.name} — {surah.ayahCount} آية</b> • {w} وجه (من {r.fromAyah} إلى {r.toAyah})</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-[11px] font-bold">من (آية)</label>
+                    <div className="flex items-center gap-1 mt-1">
+                      <button type="button" onClick={()=> updateRow(r.id,{fromAyah: Math.max(1, r.fromAyah-1)})} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">−</button>
+                      <input type="number" value={r.fromAyah} onChange={e=> updateRow(r.id,{fromAyah: Number(e.target.value)||1})} className="flex-1 px-3 py-2.5 rounded-xl border text-center font-black text-sm" />
+                      <button type="button" onClick={()=> updateRow(r.id,{fromAyah: Math.min(surah.ayahCount, r.fromAyah+1)})} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">+</button>
+                    </div></div>
+                  <div><label className="text-[11px] font-bold">إلى (آية)</label>
+                    <div className="flex items-center gap-1 mt-1">
+                      <button type="button" onClick={()=> updateRow(r.id,{toAyah: Math.max(r.fromAyah, r.toAyah-1)})} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">−</button>
+                      <input type="number" value={r.toAyah} onChange={e=> updateRow(r.id,{toAyah: Number(e.target.value)||1})} className="flex-1 px-3 py-2.5 rounded-xl border text-center font-black text-sm" />
+                      <button type="button" onClick={()=> updateRow(r.id,{toAyah: Math.min(surah.ayahCount, r.toAyah+1)})} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">+</button>
+                    </div></div>
+                </div>
+              </div>
+            )
+          })}
         </div>
+
         <div><label className="text-[11px] font-bold">التقدير — ضغطة واحدة</label>
           <div className="grid grid-cols-4 gap-2 mt-1">
             {[3,2,1,0].map(n=> (
@@ -2443,9 +2591,9 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
         <div><label className="text-[11px] font-bold">ملاحظات <span className="text-gray-400 font-normal">(اختياري)</span></label>
           <input value={notes} onChange={e=> setNotes(e.target.value)} placeholder="اختياري — اتركه فارغاً إذا لا يوجد" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm" /></div>
         <button onClick={handleSave} disabled={readOnly} className={`w-full py-3 rounded-xl font-black text-sm shadow-sm transition ${readOnly?"bg-gray-200 text-gray-500 cursor-not-allowed":"bg-[#1F5E3A] hover:bg-[#163F27] text-white"}`}>
-          {readOnly ? "العرض فقط — لا يمكن الحفظ" : `حفظ ${tab==="mem"?"الحفظ":tab==="kubra"?"المراجعة الكبرى":"المراجعة الصغرى"} — ${faces} وجه ✓`}
+          {readOnly ? "العرض فقط — لا يمكن الحفظ" : `حفظ ${tab==="mem"?"الحفظ":tab==="kubra"?"المراجعة الكبرى":"المراجعة الصغرى"} — ${totalWajh} وجه (${rows.length} سور) ✓`}
         </button>
-        {!readOnly && <p className="text-center text-[11px] text-gray-400">يُحفظ تلقائياً في المتصفح والسحابة — أسهل من الكتابة على الورق</p>}
+        {!readOnly && <p className="text-center text-[11px] text-gray-400">يُحفظ تلقائياً في المتصفح والسحابة — أسهل من الكتابة على الورق • الأوجه محسوبة بدقة من صفحات المصحف</p>}
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2">
         <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{periodStats.totalMem} وجه</p><p className="text-[10px] text-gray-400">مطلوب: {periodStats.requiredMem||"—"} {periodStats.requiredMem? (periodStats.totalMem>=periodStats.requiredMem ? "✓ تم" : "○ لم يتم"):""}</p></div>
@@ -2455,6 +2603,7 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
     </div>
   )
 }
+
 
 
 function StudentDetail({ student, circles, staff, attendance, currentUserId, plan, readOnly, onClose, onAddMem, onAddSmall, onAddLarge, onAddError, onAddNote, onUpdate }: {
@@ -2469,12 +2618,12 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const isValidWa = !!waDigits && waDigits.length === 12 && /^9665\d{8}$/.test(waDigits)
   const waLink = isValidWa ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
   const waGeneral = `https://wa.me/?text=${encodeURIComponent(waText)}`
-  const totalAyah = student.memorizationLog.reduce((a, b) => a + b.ayahCount, 0)
-  const totalReview = student.reviewLog.reduce((a, b) => a + b.ayahCount, 0)
+  const totalAyah = student.memorizationLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
+  const totalReview = student.reviewLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x => x.grade === "ممتاز").length / student.memorizationLog.length * 100) : 0
   const cumData = useMemo(() => {
     const all = [...student.memorizationLog, ...student.reviewLog].sort((a, b) => a.date.localeCompare(b.date))
-    let cum = 0; return all.map(e => { cum += (e as any).ayahCount; return { date: e.date.slice(5), cum } }).slice(-10)
+    let cum = 0; return all.map(e => { const w = calcWajh((e as any).surahNumber, (e as any).fromAyah, (e as any).toAyah); cum += w; return { date: e.date.slice(5), cum } }).slice(-10)
   }, [student])
 
   // ===== المطلوب غداً — آخر تسجيل لكل نوع =====
@@ -2549,8 +2698,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <MiniStat label="مقدار الحفظ" value={totalAyah + " آية"} />
-          <MiniStat label="مقدار المراجعة" value={totalReview + " آية"} />
+          <MiniStat label="مقدار الحفظ" value={totalAyah + " وجه"} />
+          <MiniStat label="مقدار المراجعة" value={totalReview + " وجه"} />
           <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
           <MiniStat label="عدد الأخطاء" value={String(student.errorsLog.length)} />
         </div>
@@ -2709,7 +2858,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
+                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -2729,7 +2878,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
+                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -2779,7 +2928,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
         {/* Chart */}
         <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">تطور الحفظ والمراجعة (تراكمي بالآيات)</h4>
+          <h4 className="font-bold text-xs mb-3">تطور الحفظ والمراجعة (تراكمي بالأوجه)</h4>
           {cumData.length < 2 ? <p className="text-xs text-gray-400 text-center py-6">لا توجد بيانات كافية لعرض الرسم البياني بعد</p> :
             <div className="h-[140px] flex items-end gap-1">
               {cumData.map((d, i) => {
@@ -2787,7 +2936,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                 const h = Math.max(8, (d.cum / max) * 120)
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full rounded-t-lg transition" style={{ height: h, background: i % 2 ? "#1F5E3A" : "#C9A227" }} title={`${d.date}: ${d.cum} آية`} />
+                    <div className="w-full rounded-t-lg transition" style={{ height: h, background: i % 2 ? "#1F5E3A" : "#C9A227" }} title={`${d.date}: ${d.cum} وجه`} />
                     <span className="text-[9px] text-gray-500 rotate-[-30deg]">{d.date}</span>
                   </div>
                 )
@@ -2893,7 +3042,7 @@ function LogRow({ e, staff, onDelete, hideDelete }: { e: ReviewEntry; staff: Sta
   return (
     <div className="flex items-center justify-between p-2.5 rounded-xl border bg-white">
       <div>
-        <p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({e.ayahCount} آية)</p>
+        <p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</p>
         <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
       </div>
       <div className="flex items-center gap-1.5">
