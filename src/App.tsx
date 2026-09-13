@@ -1878,7 +1878,12 @@ export default function App() {
       {showMemModal && selectedStudent && (
         <Modal title="+ تسجيل حفظ جديد" onClose={() => setShowMemModal(false)}>
           <div className="grid gap-3">
-            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+            <div>
+              <div className="relative mt-1">
+                <input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full px-3 py-2.5 rounded-xl border text-sm bg-white pr-3 pl-24" />
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full bg-[#1F5E3A] text-white text-[11px] font-bold pointer-events-none">{getDayNameFromISO(memForm.date)}</span>
+              </div>
+            </div>
             <div>
               
               <div className="relative mt-1">
@@ -1932,7 +1937,7 @@ export default function App() {
               <select value={memForm.grade} onChange={e => setMemForm({ ...memForm, grade: e.target.value as Grade })} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
                 {GRADES.map(g => <option key={g} value={g}>{g === "بدون تقدير" ? "بدون تقدير — بانتظار التسميع (افتراضي)" : g}</option>)}
               </select></div>
-            <div><label className="text-xs font-bold">ملاحظات</label><input value={memForm.notes} onChange={e => setMemForm({ ...memForm, notes: e.target.value })} placeholder="اختياري" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm" /></div>
+            
           </div>
           <div className="flex gap-2 mt-4"><button onClick={handleAddMemorization} className="flex-1 py-2.5 rounded-xl bg-[#1F5E3A] text-white font-bold text-sm">حفظ التسجيل</button><button onClick={() => setShowMemModal(false)} className="flex-1 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">إلغاء</button></div>
         </Modal>
@@ -1942,7 +1947,12 @@ export default function App() {
         <Modal title={showReviewModal === "small" ? "+ تسجيل مراجعة صغرى" : "+ تسجيل مراجعة كبرى"} onClose={() => setShowReviewModal(null)}>
           <p className="text-xs text-gray-500 mb-3">{showReviewModal === "small" ? "مخصصة للمراجعة القريبة واليومية (الماضي القريب)" : "مخصصة للمراجعة التراكمية البعيدة"}</p>
           <div className="grid gap-3">
-            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+            <div>
+              <div className="relative mt-1">
+                <input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full px-3 py-2.5 rounded-xl border text-sm bg-white pr-3 pl-24" />
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full bg-[#1F5E3A] text-white text-[11px] font-bold pointer-events-none">{getDayNameFromISO(reviewForm.date)}</span>
+              </div>
+            </div>
             <div>
               
               <div className="relative mt-1">
