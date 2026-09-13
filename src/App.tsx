@@ -195,6 +195,34 @@ const hasVisitedToday = (s: Student) => {
   return (s.visitLog || []).some(v => v.date === today)
 }
 
+// ===================== Helpers — أرقام الجوال السعودية وواتساب =====================
+const cleanDigits = (phone: string) => phone.replace(/\D/g, "")
+const isValidSaudiMobile = (phone: string): boolean => {
+  if (!phone.trim()) return true // اختياري
+  const d = cleanDigits(phone)
+  if (d.length === 10 && /^05\d{8}$/.test(d)) return true
+  if (d.length === 9 && /^5\d{8}$/.test(d)) return true
+  if (d.length === 12 && /^9665\d{8}$/.test(d)) return true
+  if (d.length === 14 && /^009665\d{8}$/.test(d)) return true
+  return false
+}
+const toWhatsAppDigits = (phone: string): string => {
+  let d = cleanDigits(phone)
+  if (!d) return ""
+  if (d.startsWith("00")) d = d.slice(2)
+  if (d.startsWith("966") && d.length === 12) return d
+  if (d.startsWith("05") && d.length === 10) return "966" + d.slice(1)
+  if (d.startsWith("5") && d.length === 9) return "966" + d
+  if (d.startsWith("0") && d.length === 10) return "966" + d.slice(1)
+  return d
+}
+const normalizePhoneForStorage = (phone: string): string => {
+  const t = phone.trim().replace(/[\s\-()]/g, "")
+  const d = cleanDigits(t)
+  if (d.length === 9 && /^5\d{8}$/.test(d)) return "0" + d // 5xxxxxxxx → 05xxxxxxxx
+  return d || t
+}
+
 // ===================== Weekly Calendar Helpers — تقويم أسبوعي للخطة السنوية =====================
 const addDaysISO = (iso: string, days: number) => {
   const d = new Date(iso + "T12:00:00")
@@ -709,16 +737,19 @@ export default function App() {
 
   const saveStudent = () => {
     if (!studentForm.name.trim()) { showToast("اسم الطالب مطلوب"); return }
+    const rawPhone = studentForm.phone.trim()
+    if (rawPhone && !isValidSaudiMobile(rawPhone)) { showToast("رقم الجوال غير صحيح — أدخل 05XXXXXXXX أو 9665XXXXXXXX"); return }
+    const normalizedPhone = rawPhone ? normalizePhoneForStorage(rawPhone) : ""
     const effectiveCircleId = currentUser?.role === "teacher" ? (currentUser.circleId || studentForm.circleId || null) : (studentForm.circleId || null)
     if (editingStudentId) {
-      setStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, name: studentForm.name.trim(), phone: studentForm.phone.trim(), circleId: effectiveCircleId } : s))
+      setStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, name: studentForm.name.trim(), phone: normalizedPhone, circleId: effectiveCircleId } : s))
       const sb = getSupabase(); if (sb) {
         const st = students.find(x => x.id === editingStudentId)!;
-        sb.from("halqati_students").upsert({ id: st.id, name: studentForm.name.trim(), phone: studentForm.phone.trim(), circle_id: effectiveCircleId, access_token: st.accessToken, memorization_log: st.memorizationLog, review_log: st.reviewLog, errors_log: st.errorsLog, notes: st.notes, visit_log: st.visitLog }, { onConflict: "id" }).then()
+        sb.from("halqati_students").upsert({ id: st.id, name: studentForm.name.trim(), phone: normalizedPhone, circle_id: effectiveCircleId, access_token: st.accessToken, memorization_log: st.memorizationLog, review_log: st.reviewLog, errors_log: st.errorsLog, notes: st.notes, visit_log: st.visitLog }, { onConflict: "id" }).then()
       }
     } else {
       const st: Student = {
-        id: uid(), name: studentForm.name.trim(), phone: studentForm.phone.trim(), circleId: effectiveCircleId, accessToken: uid() + uid().slice(0, 6),
+        id: uid(), name: studentForm.name.trim(), phone: normalizedPhone, circleId: effectiveCircleId, accessToken: uid() + uid().slice(0, 6),
         memorizationLog: [], reviewLog: [], errorsLog: [], notes: [], visitLog: []
       }
       setStudents(prev => [...prev, st])
@@ -1487,7 +1518,7 @@ export default function App() {
         <Modal title={editingStudentId ? "تعديل الطالب" : "إضافة طالب جديد"} onClose={() => setShowStudentModal(false)}>
           <div className="grid gap-3">
             <div><label className="text-xs font-bold">اسم الطالب *</label><input value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} placeholder="اسم الطالب الثلاثي" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-[#1F5E3A]" /></div>
-            <div><label className="text-xs font-bold">رقم جوال ولي الأمر (اختياري)</label><input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} dir="ltr" placeholder="05XXXXXXXX" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-[#1F5E3A]" /></div>
+            <div><label className="text-xs font-bold">رقم جوال ولي الأمر (اختياري)</label><input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} dir="ltr" placeholder="05XXXXXXXX" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-[#1F5E3A]" /><p className="text-[10px] text-gray-400 mt-1">أدخل 05XXXXXXXX فقط — سيُحوّل تلقائياً إلى 966... عند إنشاء رابط واتساب</p></div>
             {currentUser?.role === "teacher" ? (
               <div className="bg-[#FAF9F4] rounded-xl p-3 border border-[#E1E5DA] text-center">
                 <p className="text-[11px] font-bold text-gray-500">{editingStudentId ? "حلقة الطالب" : "سيتم إضافة الطالب تلقائياً إلى حلقتك"}</p>
@@ -2114,7 +2145,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
   const link = linkForStudent(student)
   const waText = `السلام عليكم ورحمة الله،\nرابط متابعة إنجاز الطالب في حلقة القرآن الكريم (${student.name}):\n${link}`
-  const waLink = `https://wa.me/${student.phone.replace(/\D/g, "")}?text=${encodeURIComponent(waText)}`
+  const waDigits = toWhatsAppDigits(student.phone || "")
+  const waLink = waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
   const waGeneral = `https://wa.me/?text=${encodeURIComponent(waText)}`
   const totalAyah = student.memorizationLog.reduce((a, b) => a + b.ayahCount, 0)
   const totalReview = student.reviewLog.reduce((a, b) => a + b.ayahCount, 0)
