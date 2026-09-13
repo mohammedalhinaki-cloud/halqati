@@ -413,9 +413,9 @@ export default function App() {
 
   // Add logs modals
   const [showMemModal, setShowMemModal] = useState(false)
-  const [memForm, setMemForm] = useState({ surahNumber: 1, fromAyah: 1, toAyah: 7, grade: "ممتاز" as Grade, date: todayISO(), notes: "" })
+  const [memForm, setMemForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "ممتاز" as Grade, date: todayISO(), notes: "" })
   const [showReviewModal, setShowReviewModal] = useState<ReviewType | null>(null)
-  const [reviewForm, setReviewForm] = useState({ surahNumber: 2, fromAyah: 1, toAyah: 10, grade: "ممتاز" as Grade, date: todayISO() })
+  const [reviewForm, setReviewForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "ممتاز" as Grade, date: todayISO() })
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorForm, setErrorForm] = useState({ type: "خطأ في الحفظ" as ErrorType, description: "", date: todayISO() })
   const [showNoteModal, setShowNoteModal] = useState(false)
@@ -1545,7 +1545,7 @@ export default function App() {
             <div><label className="text-xs font-bold">التاريخ</label><input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
             <div><label className="text-xs font-bold">السورة</label>
               <select value={memForm.surahNumber} onChange={e => { const n = Number(e.target.value); const s = SURAHS.find(x => x.number === n)!; setMemForm({ ...memForm, surahNumber: n, fromAyah: 1, toAyah: Math.min(7, s.ayahCount) }) }} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm max-h-[200px]">
-                {SURAHS.map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
+                {[...SURAHS].reverse().map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
               </select></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="text-xs font-bold">من آية</label><input type="number" value={memForm.fromAyah} onChange={e => setMemForm({ ...memForm, fromAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
@@ -1568,7 +1568,7 @@ export default function App() {
             <div><label className="text-xs font-bold">التاريخ</label><input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
             <div><label className="text-xs font-bold">السورة</label>
               <select value={reviewForm.surahNumber} onChange={e => { const n = Number(e.target.value); const s = SURAHS.find(x => x.number === n)!; setReviewForm({ ...reviewForm, surahNumber: n, fromAyah: 1, toAyah: Math.min(10, s.ayahCount) }) }} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
-                {SURAHS.map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
+                {[...SURAHS].reverse().map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
               </select></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="text-xs font-bold">من آية</label><input type="number" value={reviewForm.fromAyah} onChange={e => setReviewForm({ ...reviewForm, fromAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
@@ -1652,17 +1652,17 @@ function StatCard({ label, value, sub, accent = "default", highlight }: { label:
 
 function Footer() {
   return (
-    <footer className="shrink-0 bg-[#163F27] text-[#cfdfd3] border-t border-white/10 py-3 px-4 text-[12px]">
-      <div className="max-w-[1100px] mx-auto flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 20c0-8 4.5-14.5 14-16.5C17.5 13.5 12.5 18.5 4 20Z" stroke="#8FBF9F" strokeWidth="1.6" strokeLinejoin="round" /><path d="M6.5 17.2C9 12.5 12.2 9 17.3 6" stroke="#8FBF9F" strokeWidth="1.3" strokeLinecap="round" /></svg>
-          <span>جميع الحقوق محفوظة © 2026 لموقع حلقتي</span>
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#C9A227]/15 text-[#e6cd7d] border border-[#C9A227]/30">الإصدار v1.0</span>
-        </div>
-        <a href="https://wa.me/966507804528?text=السلام%20عليكم،%20عندي%20ملاحظة%20حول%20موقع%20حلقتي" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#25D366]/15 border border-[#25D366]/30 text-[#d8f5e3] font-bold text-xs hover:bg-[#25D366]/20 transition">
+    <footer className="shrink-0 bg-[#163F27] text-[#cfdfd3] border-t border-white/10 py-4 px-4">
+      <div className="max-w-[1100px] mx-auto flex flex-col items-center gap-3 text-center">
+        <a href="https://wa.me/966507804528?text=السلام%20عليكم،%20عندي%20ملاحظة%20حول%20موقع%20حلقتي" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#25D366]/15 border border-[#25D366]/30 text-[#d8f5e3] font-bold text-xs hover:bg-[#25D366]/20 transition">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.01-1.04 2.47 0 1.45 1.06 2.86 1.21 3.06.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.75-.72 2-1.41.25-.69.25-1.28.17-1.41-.07-.13-.27-.2-.57-.35Z" /><path d="M12.04 2.5c-5.24 0-9.5 4.26-9.5 9.5 0 1.67.44 3.3 1.27 4.74L2.5 21.5l4.9-1.28a9.46 9.46 0 0 0 4.64 1.2h.01c5.23 0 9.49-4.26 9.49-9.5 0-2.54-.99-4.92-2.78-6.71a9.42 9.42 0 0 0-6.72-2.71Zm0 17.05h-.01a7.9 7.9 0 0 1-4.02-1.1l-.29-.17-2.91.76.78-2.84-.19-.29a7.86 7.86 0 0 1-1.21-4.21c0-4.36 3.55-7.9 7.91-7.9 2.11 0 4.09.83 5.58 2.32a7.84 7.84 0 0 1 2.31 5.59c0 4.36-3.55 7.9-7.95 7.9Z" /></svg>
           💬 للملاحظات والاستفسارات ‎+966507804528
         </a>
+        <div className="flex items-center gap-2 text-[11px] opacity-90">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 20c0-8 4.5-14.5 14-16.5C17.5 13.5 12.5 18.5 4 20Z" stroke="#8FBF9F" strokeWidth="1.5" strokeLinejoin="round" /><path d="M6.5 17.2C9 12.5 12.2 9 17.3 6" stroke="#8FBF9F" strokeWidth="1.2" strokeLinecap="round" /></svg>
+          <span className="tracking-wide">All rights reserved © 2026 Halqati</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-[#e6eeda] border border-white/15">Version v1.0</span>
+        </div>
       </div>
     </footer>
   )
