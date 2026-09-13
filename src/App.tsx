@@ -1878,15 +1878,15 @@ export default function App() {
       {showMemModal && selectedStudent && (
         <Modal title="+ تسجيل حفظ جديد" onClose={() => setShowMemModal(false)}>
           <div className="grid gap-3">
-            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><div className={`mt-1.5 text-[11px] px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 ${getDayType(memForm.date, plan).type==="recitation" ? "bg-[#E7EFE7] border-[#A5D6A7] text-[#1F5E3A]" : "bg-amber-50 border-amber-200 text-amber-800"}`}><span>📅</span><span className="font-bold">{fmtBoth(memForm.date)}</span>{getDayType(memForm.date, plan).type!=="recitation" && <span>— إجازة → سيُنقل إلى {fmtBoth(ensureRecitationDate(memForm.date, plan))}</span>}{getDayType(memForm.date, plan).type==="recitation" && <span>✓ يوم تسميع</span>}</div></div>
+            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
             <div>
-              <label className="text-xs font-bold">السور — انقر من نفس القائمة لاختيار أكثر من سورة</label>
+              
               <div className="relative mt-1">
                 <input value={memSearch} onChange={e=> setMemSearch(e.target.value)} placeholder="ابحث بالاسم أو الرقم — انقر لإضافة" className="w-full px-3 py-2 rounded-xl border text-sm pr-9 bg-white" />
                 <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
               </div>
               <div className="mt-1 max-h-[120px] overflow-auto border rounded-xl bg-white">
-                {(memSearch.trim() ? SURAHS.filter(s=> s.name.includes(memSearch.trim()) || String(s.number).includes(memSearch.trim())) : SURAHS).slice(0,30).map(s=> {
+                {[...SURAHS].reverse().filter(s=> !memSearch.trim() || s.name.includes(memSearch.trim()) || String(s.number).includes(memSearch.trim())).map(s=> {
                   const isSelected = memSelected.some(x=> x.surahNumber===s.number)
                   return (
                     <label key={s.number} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#FAF9F4] ${isSelected ? "bg-[#E7EFE7]" : ""}`}>
@@ -1942,15 +1942,15 @@ export default function App() {
         <Modal title={showReviewModal === "small" ? "+ تسجيل مراجعة صغرى" : "+ تسجيل مراجعة كبرى"} onClose={() => setShowReviewModal(null)}>
           <p className="text-xs text-gray-500 mb-3">{showReviewModal === "small" ? "مخصصة للمراجعة القريبة واليومية (الماضي القريب)" : "مخصصة للمراجعة التراكمية البعيدة"}</p>
           <div className="grid gap-3">
-            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><div className={`mt-1.5 text-[11px] px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 ${getDayType(reviewForm.date, plan).type==="recitation" ? "bg-[#E7EFE7] border-[#A5D6A7] text-[#1F5E3A]" : "bg-amber-50 border-amber-200 text-amber-800"}`}><span>📅</span><span className="font-bold">{fmtBoth(reviewForm.date)}</span>{getDayType(reviewForm.date, plan).type!=="recitation" && <span>— إجازة → سيُنقل إلى {fmtBoth(ensureRecitationDate(reviewForm.date, plan))}</span>}{getDayType(reviewForm.date, plan).type==="recitation" && <span>✓ يوم تسميع</span>}</div></div>
+            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
             <div>
-              <label className="text-xs font-bold">السور — انقر من نفس القائمة لاختيار أكثر من سورة</label>
+              
               <div className="relative mt-1">
                 <input value={reviewSearch} onChange={e=> setReviewSearch(e.target.value)} placeholder="ابحث بالاسم أو الرقم — انقر لإضافة" className="w-full px-3 py-2 rounded-xl border text-sm pr-9 bg-white" />
                 <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
               </div>
               <div className="mt-1 max-h-[120px] overflow-auto border rounded-xl bg-white">
-                {(reviewSearch.trim() ? SURAHS.filter(s=> s.name.includes(reviewSearch.trim()) || String(s.number).includes(reviewSearch.trim())) : SURAHS).slice(0,30).map(s=> {
+                {[...SURAHS].reverse().filter(s=> !reviewSearch.trim() || s.name.includes(reviewSearch.trim()) || String(s.number).includes(reviewSearch.trim())).map(s=> {
                   const isSelected = reviewSelected.some(x=> x.surahNumber===s.number)
                   return (
                     <label key={s.number} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#FAF9F4] ${isSelected ? "bg-[#E7EFE7]" : ""}`}>
