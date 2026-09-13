@@ -1887,13 +1887,8 @@ function SupabaseModal({ url, setUrl, keyVal, setKey, onClose, onSave, onClear, 
                 <button onClick={onTest} className="px-5 py-2 rounded-xl bg-white border font-bold text-sm">اختبار الاتصال</button>
                 <button onClick={onClear} className="px-5 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 font-bold text-sm">فصل الربط</button>
               </div>
-              <div className="bg-gray-50 rounded-xl p-3 border">
-                <p className="font-bold text-xs mb-2">أدوات المزامنة السحابية:</p>
-                <div className="flex gap-2 flex-wrap">
-                  <button onClick={onPush} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">⬆️ رفع البيانات إلى السحابة</button>
-                  <button onClick={onPull} className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold">⬇️ سحب البيانات من السحابة</button>
-                </div>
-                <p className="text-[11px] text-gray-500 mt-2">استخدم الرفع بعد إدخال بيانات جديدة، والسحب لجلب آخر التحديثات من الأجهزة الأخرى.</p>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs leading-5 text-emerald-800">
+                ✅ <b>تم تفعيل الحفظ التلقائي</b> — كل إضافة أو تعديل يُحفظ فوراً في السحابة عند توفر الاتصال، بدون حاجة للضغط على أي زر.
               </div>
             </div>
           ) : (
