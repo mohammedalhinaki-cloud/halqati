@@ -2621,11 +2621,6 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const totalAyah = student.memorizationLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
   const totalReview = student.reviewLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x => x.grade === "ممتاز").length / student.memorizationLog.length * 100) : 0
-  const cumData = useMemo(() => {
-    const all = [...student.memorizationLog, ...student.reviewLog].sort((a, b) => a.date.localeCompare(b.date))
-    let cum = 0; return all.map(e => { const w = calcWajh((e as any).surahNumber, (e as any).fromAyah, (e as any).toAyah); cum += w; return { date: e.date.slice(5), cum } }).slice(-10)
-  }, [student])
-
   // ===== المطلوب غداً — آخر تسجيل لكل نوع =====
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
   const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
@@ -2926,24 +2921,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           </div>
         </Section>
 
-        {/* Chart */}
-        <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">تطور الحفظ والمراجعة (تراكمي بالأوجه)</h4>
-          {cumData.length < 2 ? <p className="text-xs text-gray-400 text-center py-6">لا توجد بيانات كافية لعرض الرسم البياني بعد</p> :
-            <div className="h-[140px] flex items-end gap-1">
-              {cumData.map((d, i) => {
-                const max = Math.max(...cumData.map(x => x.cum), 1)
-                const h = Math.max(8, (d.cum / max) * 120)
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full rounded-t-lg transition" style={{ height: h, background: i % 2 ? "#1F5E3A" : "#C9A227" }} title={`${d.date}: ${d.cum} وجه`} />
-                    <span className="text-[9px] text-gray-500 rotate-[-30deg]">{d.date}</span>
-                  </div>
-                )
-              })}
-            </div>
-          }
-        </div>
+
 
 
 
