@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js"
 
 // ===================== أنواع البيانات =====================
 type Role = "owner" | "admin" | "supervisor" | "teacher"
-type Grade = "ممتاز" | "جيد" | "يحتاج إعادة" | "بدون تقدير"
+type Grade = "ممتاز" | "جيد" | "جيد جداً" | "يحتاج إعادة" | "بدون تقدير"
 type ReviewType = "small" | "large"
 type ErrorType = "خطأ في الحفظ" | "نسيان" | "تردد" | "خطأ تجويد" | "تلقين"
 
@@ -30,6 +30,14 @@ interface Student {
   errorsLog: ErrorEntry[];
   notes: NoteEntry[];
   visitLog: VisitEntry[];
+  targetFacesWeekly?: number;
+  targetFromSurah?: number;
+  targetToSurah?: number;
+  dailyMinFaces?: number;
+  dailyMinKubraFaces?: number;
+  studyLevel?: string;
+  internalTest1?: number[];
+  internalTest2?: number[];
 }
 interface Holiday { id: string; name: string; startDate: string; endDate: string }
 interface AcademicPlan {
@@ -68,8 +76,14 @@ const SURAHS: { number: number; name: string; ayahCount: number }[] = [
   [111, "المسد", 5], [112, "الإخلاص", 4], [113, "الفلق", 5], [114, "الناس", 6],
 ].map(([n, name, ayah]) => ({ number: Number(n), name: String(name), ayahCount: Number(ayah) }))
 
-const GRADES: Grade[] = ["بدون تقدير", "ممتاز", "جيد", "يحتاج إعادة"]
-const GRADE_COLOR: Record<string, string> = { "ممتاز": "#1F5E3A", "جيد": "#C9A227", "يحتاج إعادة": "#B3492C", "جيد جدًا": "#3F8F5F", "بدون تقدير": "#9CA3AF" }
+const GRADES: Grade[] = ["بدون تقدير", "ممتاز", "جيد جداً", "جيد", "يحتاج إعادة"]
+const GRADE_COLOR: Record<string, string> = { "ممتاز": "#1F5E3A", "جيد": "#C9A227", "جيد جداً": "#3F8F5F", "جيد جدًا": "#3F8F5F", "يحتاج إعادة": "#B3492C", "بدون تقدير": "#9CA3AF" }
+// === Helpers — نظام التقدير الرقمي 0-3 (مواصفة الاستمارات) ===
+const GRADE_NUM_TO_LABEL: Record<number, Grade> = { 3: "ممتاز", 2: "جيد جداً", 1: "جيد", 0: "بدون تقدير" }
+const GRADE_LABEL_TO_NUM: Record<string, number> = { "ممتاز": 3, "جيد جداً": 2, "جيد جدًا": 2, "جيد": 1, "يحتاج إعادة": 1, "بدون تقدير": 0 }
+const GRADE_SHORT: Record<number, string> = { 3: "٣ ممتاز", 2: "٢ جيد جداً", 1: "١ جيد", 0: "٠ لم يحفظ" }
+const calcFaces = (from: number, to: number) => Math.max(1, Math.max(0, to - from + 1))
+const getDayNameFromISO = (iso: string) => { try { return WEEKDAYS[new Date(iso+"T12:00:00").getDay()] } catch { return "" } }
 const ERROR_TYPES: ErrorType[] = ["خطأ في الحفظ", "نسيان", "تردد", "خطأ تجويد", "تلقين"]
 const ROLE_LABEL: Record<Role, string> = { owner: "المالك الرئيسي", admin: "المدير", supervisor: "المشرف", teacher: "المعلم" }
 const WEEKDAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
@@ -2293,6 +2307,156 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
 
 
+// QuickTrackingEntry component code to be inserted
+function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, onToast }: { student: Student; currentUserId: string; plan: AcademicPlan; readOnly?: boolean; onUpdate: (s: Student) => void; onToast: (m: string)=>void }) {
+  const [tab, setTab] = React.useState<"mem"|"kubra"|"sughra">("mem")
+  const [showSettings, setShowSettings] = React.useState(false)
+  const [date, setDate] = React.useState(todayISO())
+  const [surahNum, setSurahNum] = React.useState(114)
+  const [fromAyah, setFromAyah] = React.useState(1)
+  const [toAyah, setToAyah] = React.useState(6)
+  const [gradeNum, setGradeNum] = React.useState<number>(3)
+  const [lahnNum, setLahnNum] = React.useState<number>(3)
+  const [notes, setNotes] = React.useState("")
+  const [surahSearch, setSurahSearch] = React.useState("")
+  const faces = calcFaces(fromAyah, toAyah)
+  const dayName = getDayNameFromISO(date)
+  const surah = SURAHS.find(s=>s.number===surahNum)!
+  const filteredSuras = React.useMemo(()=>{
+    const q = surahSearch.trim()
+    if(!q) return SURAHS
+    return SURAHS.filter(s=> s.name.includes(q) || String(s.number).includes(q))
+  },[surahSearch])
+  React.useEffect(()=>{
+    const s = SURAHS.find(x=>x.number===surahNum)
+    if(s){
+      if(fromAyah<1) setFromAyah(1)
+      if(toAyah> s.ayahCount) setToAyah(s.ayahCount)
+      if(fromAyah> s.ayahCount) setFromAyah(1)
+    }
+  },[surahNum])
+  const handleSave = ()=>{
+    if(fromAyah<1 || toAyah> surah.ayahCount || fromAyah> toAyah){ onToast("تحقق من رقم الآيات"); return }
+    const effDate = ensureRecitationDate(date, plan)
+    const gradeLabel = GRADE_NUM_TO_LABEL[gradeNum] as Grade
+    if(tab==="mem"){
+      const entry: MemorizationEntry = { id: uid(), date: effDate, surahNumber: surah.number, surahName: surah.name, fromAyah, toAyah, ayahCount: faces, grade: gradeLabel, teacherId: currentUserId, notes: notes || undefined }
+      onUpdate({ ...student, memorizationLog: [entry, ...student.memorizationLog] })
+      onToast(effDate!==date ? `تم حفظ الحفظ ليوم ${fmtBoth(effDate)} ✓ (نُقل من إجازة)` : `تم حفظ الحفظ ✓ ${surah.name} ${fromAyah}-${toAyah} (${faces} وجه)`)
+    } else {
+      const rt: ReviewType = tab==="kubra" ? "large" : "small"
+      const entry: ReviewEntry = { id: uid(), date: effDate, reviewType: rt, surahNumber: surah.number, surahName: surah.name, fromAyah, toAyah, ayahCount: faces, grade: gradeLabel, teacherId: currentUserId }
+      onUpdate({ ...student, reviewLog: [entry, ...student.reviewLog] })
+      onToast(effDate!==date ? `تم حفظ ${tab==="kubra"?"الكبرى":"الصغرى"} ليوم ${fmtBoth(effDate)} ✓` : `تم حفظ ${tab==="kubra"?"الكبرى":"الصغرى"} ✓`)
+    }
+    setNotes("")
+  }
+  const periodStats = React.useMemo(()=>{
+    const totalMem = student.memorizationLog.reduce((a,b)=> a+b.ayahCount,0)
+    const totalKubra = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+b.ayahCount,0)
+    const totalSughra = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+b.ayahCount,0)
+    const requiredMem = student.targetFacesWeekly ? student.targetFacesWeekly * 4 : 0
+    const requiredKubra = student.dailyMinKubraFaces ? student.dailyMinKubraFaces * 28 : 0
+    return { totalMem, totalKubra, totalSughra, requiredMem, requiredKubra }
+  },[student])
+  return (
+    <div className="bg-white rounded-2xl border p-4 shadow-sm">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <h4 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>📋 الإدخال السريع — أسهل من الورق <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">ضغطات فقط</span></h4>
+        <button onClick={()=> setShowSettings(v=>!v)} className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-[#FAF9F4] border border-[#E1E5DA] text-[#5B6459] hover:bg-white">{showSettings?"إخفاء الإعدادات":"⚙️ إعدادات الطالب (مرة واحدة)"}</button>
+      </div>
+      {showSettings && (
+        <div className="bg-[#FAF9F4] rounded-xl border p-3 mb-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div><label className="text-[11px] font-bold text-gray-700">المستوى الدراسي</label>
+            <select value={student.studyLevel||""} onChange={e=> onUpdate({...student, studyLevel: e.target.value})} className="w-full mt-1 px-3 py-2 rounded-xl border bg-white text-xs">
+              <option value="">اختر المستوى</option><option value="ابتدائي">ابتدائي — 7 أسطر</option><option value="متوسط">متوسط — 10 أسطر</option><option value="ثانوي">ثانوي — وجه كامل</option>
+            </select></div>
+          <div><label className="text-[11px] font-bold">عدد الأوجه المطلوب أسبوعياً</label><input type="number" value={student.targetFacesWeekly||""} onChange={e=> onUpdate({...student, targetFacesWeekly: Number(e.target.value)||undefined})} placeholder="مثال: 5" className="w-full mt-1 px-3 py-2 rounded-xl border text-xs" /></div>
+          <div><label className="text-[11px] font-bold">من سورة</label>
+            <select value={student.targetFromSurah||""} onChange={e=> onUpdate({...student, targetFromSurah: Number(e.target.value)||undefined})} className="w-full mt-1 px-3 py-2 rounded-xl border bg-white text-xs">
+              <option value="">اختر</option>{SURAHS.map(s=> <option key={s.number} value={s.number}>{s.name}</option>)}
+            </select></div>
+          <div><label className="text-[11px] font-bold">إلى سورة</label>
+            <select value={student.targetToSurah||""} onChange={e=> onUpdate({...student, targetToSurah: Number(e.target.value)||undefined})} className="w-full mt-1 px-3 py-2 rounded-xl border bg-white text-xs">
+              <option value="">اختر</option>{SURAHS.map(s=> <option key={s.number} value={s.number}>{s.name}</option>)}
+            </select></div>
+          <div><label className="text-[11px] font-bold">الحد الأدنى للحفظ اليومي (وجه)</label><input type="number" value={student.dailyMinFaces||""} onChange={e=> onUpdate({...student, dailyMinFaces: Number(e.target.value)||undefined})} placeholder="1" className="w-full mt-1 px-3 py-2 rounded-xl border text-xs" /></div>
+          <div><label className="text-[11px] font-bold">الحد الأدنى للمراجعة الكبرى (وجه)</label><input type="number" value={student.dailyMinKubraFaces||""} onChange={e=> onUpdate({...student, dailyMinKubraFaces: Number(e.target.value)||undefined})} placeholder="نصف وجه لكل جزء" className="w-full mt-1 px-3 py-2 rounded-xl border text-xs" /></div>
+          <p className="md:col-span-2 text-[11px] text-gray-500 bg-white border rounded-xl p-2">💡 هذه الإعدادات تُدخل مرة واحدة فقط وتُستخدم لحساب <b>نتيجة الفترة</b> و <b>التقرير النهائي</b> تلقائياً.</p>
+        </div>
+      )}
+      <div className="flex gap-1 p-1 rounded-full bg-gray-100 border mb-3">
+        <button onClick={()=> setTab("mem")} className={`flex-1 py-2 rounded-full text-xs font-black transition ${tab==="mem"? "bg-[#1F5E3A] text-white shadow":"text-gray-600 hover:text-gray-800"}`}>📖 حفظ (جديد)</button>
+        <button onClick={()=> setTab("kubra")} className={`flex-1 py-2 rounded-full text-xs font-black transition ${tab==="kubra"? "bg-[#1F5E3A] text-white shadow":"text-gray-600 hover:text-gray-800"}`}>📚 مراجعة كبرى</button>
+        <button onClick={()=> setTab("sughra")} className={`flex-1 py-2 rounded-full text-xs font-black transition ${tab==="sughra"? "bg-[#1F5E3A] text-white shadow":"text-gray-600 hover:text-gray-800"}`}>🔁 مراجعة صغرى</button>
+      </div>
+      <div className="grid gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-[11px] font-bold text-gray-700">التاريخ <span className="text-gray-400 font-normal">(تلقائي)</span></label>
+            <input type="date" value={date} onChange={e=> setDate(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm bg-white" />
+            <p className="text-[11px] text-[#1F5E3A] font-bold mt-1">{dayName} • {fmtBoth(date)} {getDayType(date, plan).type!=="recitation" && <span className="text-amber-700">→ سيُنقل إلى {fmtBoth(ensureRecitationDate(date, plan))}</span>}</p></div>
+          <div><label className="text-[11px] font-bold text-gray-700">عدد الأوجه <span className="text-gray-400 font-normal">(يُحسب تلقائياً)</span></label>
+            <div className="mt-1 px-3 py-2.5 rounded-xl border bg-[#E7EFE7] border-[#A5D6A7] text-center"><span className="font-black text-lg" style={{color:"#1F5E3A"}}>{faces}</span> <span className="text-xs font-bold text-[#1F5E3A]">وجه</span> <span className="text-[11px] text-gray-500">({fromAyah} → {toAyah})</span></div></div>
+        </div>
+        <div><label className="text-[11px] font-bold text-gray-700">السورة — قائمة منسدلة قابلة للبحث (١١٤ سورة)</label>
+          <div className="relative mt-1">
+            <input value={surahSearch} onChange={e=> setSurahSearch(e.target.value)} placeholder="ابحث بالاسم أو الرقم..." className="w-full px-3 py-2.5 rounded-xl border text-sm pr-9 bg-white" />
+            <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
+          </div>
+          <select value={surahNum} onChange={e=> setSurahNum(Number(e.target.value))} className="w-full mt-2 px-3 py-2.5 rounded-xl border bg-white text-sm max-h-[180px]">
+            {filteredSuras.map(s=> <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
+          </select>
+          <p className="text-[11px] text-gray-500 mt-1">المختارة: <b style={{color:"#1F5E3A"}}>{surah.name} — {surah.ayahCount} آية</b> • اكتب في البحث للوصول أسرع</p></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-[11px] font-bold">من (آية)</label>
+            <div className="flex items-center gap-1 mt-1">
+              <button type="button" onClick={()=> setFromAyah(v=> Math.max(1, v-1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">−</button>
+              <input type="number" value={fromAyah} onChange={e=> setFromAyah(Number(e.target.value)||1)} className="flex-1 px-3 py-2.5 rounded-xl border text-center font-black text-sm" />
+              <button type="button" onClick={()=> setFromAyah(v=> Math.min(surah.ayahCount, v+1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">+</button>
+            </div></div>
+          <div><label className="text-[11px] font-bold">إلى (آية)</label>
+            <div className="flex items-center gap-1 mt-1">
+              <button type="button" onClick={()=> setToAyah(v=> Math.max(fromAyah, v-1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">−</button>
+              <input type="number" value={toAyah} onChange={e=> setToAyah(Number(e.target.value)||1)} className="flex-1 px-3 py-2.5 rounded-xl border text-center font-black text-sm" />
+              <button type="button" onClick={()=> setToAyah(v=> Math.min(surah.ayahCount, v+1))} className="w-9 h-9 rounded-xl bg-white border font-black hover:bg-gray-50">+</button>
+            </div></div>
+        </div>
+        <div><label className="text-[11px] font-bold">التقدير — ضغطة واحدة</label>
+          <div className="grid grid-cols-4 gap-2 mt-1">
+            {[3,2,1,0].map(n=> (
+              <button key={n} type="button" onClick={()=> setGradeNum(n)} className={`py-3 rounded-xl border-2 font-black text-xs transition ${gradeNum===n ? "text-white shadow" : "bg-white hover:bg-gray-50 text-gray-700 border-[#E1E5DA]"}`} style={gradeNum===n ? {background: n===3?"#1F5E3A":n===2?"#3F8F5F":n===1?"#C9A227":"#B3492C", borderColor: n===3?"#1F5E3A":n===2?"#3F8F5F":n===1?"#C9A227":"#B3492C"} : {}}>
+                <div className="text-sm">{n}</div><div className="text-[11px] leading-none mt-1">{n===3?"ممتاز":n===2?"جيد جداً":n===1?"جيد":"لم يحفظ"}</div><div className="text-[10px] opacity-70 font-normal mt-0.5">{n===3?"بدون أخطاء":n===2?"خطأ واحد":n===1?"خطأين":"٣+ أخطاء"}</div>
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1">يُخزن كرقم {gradeNum} خلف الكواليس — <b>{GRADE_SHORT[gradeNum]}</b></p></div>
+        {tab==="sughra" && (
+          <div><label className="text-[11px] font-bold">اللحن (خاص بالمراجعة الصغرى)</label>
+            <div className="grid grid-cols-4 gap-2 mt-1">
+              {[3,2,1,0].map(n=> (
+                <button key={n} type="button" onClick={()=> setLahnNum(n)} className={`py-2.5 rounded-xl border-2 font-bold text-xs transition ${lahnNum===n ? "text-white shadow" : "bg-white hover:bg-gray-50 text-gray-700"}`} style={lahnNum===n ? {background: n===3?"#1F5E3A":n===2?"#3F8F5F":n===1?"#C9A227":"#B3492C", borderColor:"transparent"} : {}}>
+                  {n===3?"ممتاز":n===2?"جيد جداً":n===1?"جيد":"ضعيف"}
+                </button>
+              ))}
+            </div></div>
+        )}
+        <div><label className="text-[11px] font-bold">ملاحظات <span className="text-gray-400 font-normal">(اختياري)</span></label>
+          <input value={notes} onChange={e=> setNotes(e.target.value)} placeholder="اختياري — اتركه فارغاً إذا لا يوجد" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm" /></div>
+        <button onClick={handleSave} disabled={readOnly} className={`w-full py-3 rounded-xl font-black text-sm shadow-sm transition ${readOnly?"bg-gray-200 text-gray-500 cursor-not-allowed":"bg-[#1F5E3A] hover:bg-[#163F27] text-white"}`}>
+          {readOnly ? "العرض فقط — لا يمكن الحفظ" : `حفظ ${tab==="mem"?"الحفظ":tab==="kubra"?"المراجعة الكبرى":"المراجعة الصغرى"} — ${faces} وجه ✓`}
+        </button>
+        {!readOnly && <p className="text-center text-[11px] text-gray-400">يُحفظ تلقائياً في المتصفح والسحابة — أسهل من الكتابة على الورق</p>}
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{periodStats.totalMem} وجه</p><p className="text-[10px] text-gray-400">مطلوب: {periodStats.requiredMem||"—"} {periodStats.requiredMem? (periodStats.totalMem>=periodStats.requiredMem ? "✓ تم" : "○ لم يتم"):""}</p></div>
+        <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{periodStats.totalKubra} وجه</p><p className="text-[10px] text-[#2E7D32]">مطلوب: {periodStats.requiredKubra||"—"}</p></div>
+        <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{periodStats.totalSughra} وجه</p><p className="text-[10px] text-[#1565C0]">آخر جلسة: {student.reviewLog.find(x=>x.reviewType==="small")?.date || "—"}</p></div>
+      </div>
+    </div>
+  )
+}
+
+
 function StudentDetail({ student, circles, staff, attendance, currentUserId, plan, readOnly, onClose, onAddMem, onAddSmall, onAddLarge, onAddError, onAddNote, onUpdate }: {
   student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; currentUserId: string; plan: AcademicPlan; readOnly?: boolean;
   onClose: () => void; onAddMem: () => void; onAddSmall: () => void; onAddLarge: () => void; onAddError: () => void; onAddNote: () => void;
@@ -2390,6 +2554,9 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
           <MiniStat label="عدد الأخطاء" value={String(student.errorsLog.length)} />
         </div>
+
+        {/* ===== الإدخال السريع — المواصفة الجديدة (3 تبويبات بضغطات فقط) ===== */}
+        <QuickTrackingEntry student={student} currentUserId={currentUserId} plan={plan} readOnly={readOnly} onUpdate={onUpdate} onToast={(m)=>{}} />
 
         {/* ===== المطلوب غداً — آخر تسجيل لكل نوع في مكان واحد (بدون اسم المعلم) ===== */}
         <div className="space-y-3">
