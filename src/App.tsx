@@ -709,15 +709,16 @@ export default function App() {
 
   const saveStudent = () => {
     if (!studentForm.name.trim()) { showToast("اسم الطالب مطلوب"); return }
+    const effectiveCircleId = currentUser?.role === "teacher" ? (currentUser.circleId || studentForm.circleId || null) : (studentForm.circleId || null)
     if (editingStudentId) {
-      setStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, name: studentForm.name.trim(), phone: studentForm.phone.trim(), circleId: studentForm.circleId || null } : s))
+      setStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, name: studentForm.name.trim(), phone: studentForm.phone.trim(), circleId: effectiveCircleId } : s))
       const sb = getSupabase(); if (sb) {
         const st = students.find(x => x.id === editingStudentId)!;
-        sb.from("halqati_students").upsert({ id: st.id, name: studentForm.name.trim(), phone: studentForm.phone.trim(), circle_id: studentForm.circleId || null, access_token: st.accessToken, memorization_log: st.memorizationLog, review_log: st.reviewLog, errors_log: st.errorsLog, notes: st.notes, visit_log: st.visitLog }, { onConflict: "id" }).then()
+        sb.from("halqati_students").upsert({ id: st.id, name: studentForm.name.trim(), phone: studentForm.phone.trim(), circle_id: effectiveCircleId, access_token: st.accessToken, memorization_log: st.memorizationLog, review_log: st.reviewLog, errors_log: st.errorsLog, notes: st.notes, visit_log: st.visitLog }, { onConflict: "id" }).then()
       }
     } else {
       const st: Student = {
-        id: uid(), name: studentForm.name.trim(), phone: studentForm.phone.trim(), circleId: studentForm.circleId || null, accessToken: uid() + uid().slice(0, 6),
+        id: uid(), name: studentForm.name.trim(), phone: studentForm.phone.trim(), circleId: effectiveCircleId, accessToken: uid() + uid().slice(0, 6),
         memorizationLog: [], reviewLog: [], errorsLog: [], notes: [], visitLog: []
       }
       setStudents(prev => [...prev, st])
@@ -1235,7 +1236,7 @@ export default function App() {
             ) : (currentUser?.role === "admin" || currentUser?.role === "teacher") ? (
               <button onClick={() => setShowTeacherPlan(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📅 الخطة</button>
             ) : null}
-            <button onClick={() => { setStudentForm({ name: "", phone: "", circleId: filterCircle !== "all" ? filterCircle : "" }); setEditingStudentId(null); setShowStudentModal(true) }} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">+ إضافة طالب</button>
+            <button onClick={() => { const autoCircle = currentUser?.role === "teacher" ? (currentUser.circleId || "") : (filterCircle !== "all" ? filterCircle : ""); setStudentForm({ name: "", phone: "", circleId: autoCircle }); setEditingStudentId(null); setShowStudentModal(true) }} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">+ إضافة طالب</button>
           </div>
         </div>
 
@@ -1487,11 +1488,18 @@ export default function App() {
           <div className="grid gap-3">
             <div><label className="text-xs font-bold">اسم الطالب *</label><input value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} placeholder="اسم الطالب الثلاثي" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-[#1F5E3A]" /></div>
             <div><label className="text-xs font-bold">رقم جوال ولي الأمر (اختياري)</label><input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} dir="ltr" placeholder="05XXXXXXXX" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-[#1F5E3A]" /></div>
+            {currentUser?.role === "teacher" ? (
+              <div className="bg-[#FAF9F4] rounded-xl p-3 border border-[#E1E5DA] text-center">
+                <p className="text-[11px] font-bold text-gray-500">{editingStudentId ? "حلقة الطالب" : "سيتم إضافة الطالب تلقائياً إلى حلقتك"}</p>
+                <p className="font-bold text-sm mt-1" style={{color:"#1F5E3A"}}>{circles.find(c=>c.id===(studentForm.circleId || currentUser?.circleId))?.name || "حلقتك"}</p>
+              </div>
+            ) : (
             <div><label className="text-xs font-bold">الحلقة</label>
               <select value={studentForm.circleId} onChange={e => setStudentForm({ ...studentForm, circleId: e.target.value })} className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm bg-white">
                 <option value="">بدون حلقة</option>
                 {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select></div>
+            )}
           </div>
           <div className="flex gap-2 mt-4">
             <button onClick={saveStudent} className="flex-1 py-2.5 rounded-xl bg-[#1F5E3A] text-white font-bold text-sm">حفظ</button>
