@@ -177,11 +177,12 @@ const toHijri = (iso: string) => {
 }
 const fmtBoth = (iso: string) => {
   try {
+    const wd = WEEKDAYS[new Date(iso + "T12:00:00").getDay()] || ""
     const h = toHijri(iso)
     const m = fmtDate(iso)
     const hijri = h.includes("هـ") ? h : `${h}هـ`
     const greg = m.includes("م") ? m : `${m}م`
-    return `${hijri} — ${greg}`
+    return `${wd} ${hijri} — ${greg}`
   } catch { return iso }
 }
 const tokenForStudent = (s: Student) => s.accessToken
@@ -249,6 +250,22 @@ function getDayType(iso: string, plan: AcademicPlan): { type: DayType, holiday: 
   const wd = getWeekday(iso)
   if (!plan.activeWeekdays.includes(wd)) return { type: "regularHoliday", holiday: null }
   return { type: "recitation", holiday: null }
+}
+// === helpers: تاريخ مسبوق بيوم + ضمان يوم تسميع ===
+const getNextRecitationISO = (fromISO: string, plan: AcademicPlan): string => {
+  for (let off = 1; off <= 60; off++) {
+    const cand = addDaysISO(fromISO, off)
+    if (getDayType(cand, plan).type === "recitation") return cand
+  }
+  return addDaysISO(fromISO, 1)
+}
+const ensureRecitationDate = (iso: string, plan: AcademicPlan): string => {
+  if (getDayType(iso, plan).type === "recitation") return iso
+  for (let off = 1; off <= 60; off++) {
+    const cand = addDaysISO(iso, off)
+    if (getDayType(cand, plan).type === "recitation") return cand
+  }
+  return iso
 }
 interface WeekInfo { weekNumber: number; start: string; end: string; days: (string | null)[] }
 function generateWeeks(plan: AcademicPlan): WeekInfo[] {
@@ -872,27 +889,29 @@ export default function App() {
     if (!selectedStudent) return
     const surah = SURAHS.find(s => s.number === memForm.surahNumber)!
     if (memForm.fromAyah < 1 || memForm.toAyah > surah.ayahCount || memForm.fromAyah > memForm.toAyah) { showToast("تحقق من رقم الآيات"); return }
+    const effectiveMemDate = ensureRecitationDate(memForm.date, plan)
     const entry: MemorizationEntry = {
-      id: uid(), date: memForm.date, surahNumber: surah.number, surahName: surah.name,
+      id: uid(), date: effectiveMemDate, surahNumber: surah.number, surahName: surah.name,
       fromAyah: memForm.fromAyah, toAyah: memForm.toAyah, ayahCount: memForm.toAyah - memForm.fromAyah + 1,
       grade: memForm.grade, teacherId: currentUserId || "", notes: memForm.notes
     }
     const updated = { ...selectedStudent, memorizationLog: [entry, ...selectedStudent.memorizationLog] }
     persistStudent(updated)
-    setShowMemModal(false); showToast("تم تسجيل الحفظ ✓")
+    setShowMemModal(false); showToast(effectiveMemDate !== memForm.date ? `تم تسجيل الحفظ ليوم ${WEEKDAYS[getWeekday(effectiveMemDate)]} ${fmtBoth(effectiveMemDate)} ✓ (نُقل من إجازة)` : `تم تسجيل الحفظ ليوم ${WEEKDAYS[getWeekday(effectiveMemDate)]} ${fmtBoth(effectiveMemDate)} ✓`)
   }
   const handleAddReview = () => {
     if (!selectedStudent || !showReviewModal) return
     const surah = SURAHS.find(s => s.number === reviewForm.surahNumber)!
     if (reviewForm.fromAyah < 1 || reviewForm.toAyah > surah.ayahCount || reviewForm.fromAyah > reviewForm.toAyah) { showToast("تحقق من الآيات"); return }
+    const effectiveReviewDate = ensureRecitationDate(reviewForm.date, plan)
     const entry: ReviewEntry = {
-      id: uid(), date: reviewForm.date, reviewType: showReviewModal,
+      id: uid(), date: effectiveReviewDate, reviewType: showReviewModal,
       surahNumber: surah.number, surahName: surah.name, fromAyah: reviewForm.fromAyah, toAyah: reviewForm.toAyah,
       ayahCount: reviewForm.toAyah - reviewForm.fromAyah + 1, grade: reviewForm.grade, teacherId: currentUserId || ""
     }
     const updated = { ...selectedStudent, reviewLog: [entry, ...selectedStudent.reviewLog] }
     persistStudent(updated)
-    setShowReviewModal(null); showToast("تم تسجيل المراجعة ✓")
+    setShowReviewModal(null); showToast(effectiveReviewDate !== reviewForm.date ? `تم تسجيل المراجعة ليوم ${WEEKDAYS[getWeekday(effectiveReviewDate)]} ${fmtBoth(effectiveReviewDate)} ✓ (نُقل من إجازة)` : `تم تسجيل المراجعة ليوم ${WEEKDAYS[getWeekday(effectiveReviewDate)]} ${fmtBoth(effectiveReviewDate)} ✓`)
   }
   const handleAddError = () => {
     if (!selectedStudent) return
@@ -1554,9 +1573,9 @@ export default function App() {
               plan={plan}
               readOnly={currentUser?.role === "admin"}
               onClose={() => setSelectedStudentId(null)}
-              onAddMem={() => setShowMemModal(true)}
-              onAddSmall={() => { setReviewForm(f => ({ ...f, date: todayISO() })); setShowReviewModal("small") }}
-              onAddLarge={() => { setReviewForm(f => ({ ...f, date: todayISO() })); setShowReviewModal("large") }}
+              onAddMem={() => { setMemForm(f => ({ ...f, date: getNextRecitationISO(todayISO(), plan) })); setShowMemModal(true) }}
+              onAddSmall={() => { setReviewForm(f => ({ ...f, date: getNextRecitationISO(todayISO(), plan) })); setShowReviewModal("small") }}
+              onAddLarge={() => { setReviewForm(f => ({ ...f, date: getNextRecitationISO(todayISO(), plan) })); setShowReviewModal("large") }}
               onAddError={() => setShowErrorModal(true)}
               onAddNote={() => setShowNoteModal(true)}
               onUpdate={persistStudent}
@@ -1634,7 +1653,7 @@ export default function App() {
       {showMemModal && selectedStudent && (
         <Modal title="+ تسجيل حفظ جديد" onClose={() => setShowMemModal(false)}>
           <div className="grid gap-3">
-            <div><label className="text-xs font-bold">التاريخ</label><input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><div className={`mt-1.5 text-[11px] px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 ${getDayType(memForm.date, plan).type==="recitation" ? "bg-[#E7EFE7] border-[#A5D6A7] text-[#1F5E3A]" : "bg-amber-50 border-amber-200 text-amber-800"}`}><span>📅</span><span className="font-bold">{WEEKDAYS[getWeekday(memForm.date)]} {fmtBoth(memForm.date)}</span>{getDayType(memForm.date, plan).type!=="recitation" && <span>— إجازة → سيُنقل إلى {WEEKDAYS[getWeekday(ensureRecitationDate(memForm.date, plan))]} {fmtBoth(ensureRecitationDate(memForm.date, plan))}</span>}{getDayType(memForm.date, plan).type==="recitation" && <span>✓ يوم تسميع</span>}</div><p className="text-[10px] text-gray-400 mt-1">تلقائي ليوم: {WEEKDAYS[getWeekday(getNextRecitationISO(todayISO(), plan))]} {fmtBoth(getNextRecitationISO(todayISO(), plan))} — إذا وافق إجازة ينتقل لأقرب يوم تسميع حسب الخطة</p></div>
             <div><label className="text-xs font-bold">السورة</label>
               <select value={memForm.surahNumber} onChange={e => { const n = Number(e.target.value); const s = SURAHS.find(x => x.number === n)!; setMemForm({ ...memForm, surahNumber: n, fromAyah: 1, toAyah: Math.min(7, s.ayahCount) }) }} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm max-h-[200px]">
                 {[...SURAHS].reverse().map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
@@ -1657,7 +1676,7 @@ export default function App() {
         <Modal title={showReviewModal === "small" ? "+ تسجيل مراجعة صغرى" : "+ تسجيل مراجعة كبرى"} onClose={() => setShowReviewModal(null)}>
           <p className="text-xs text-gray-500 mb-3">{showReviewModal === "small" ? "مخصصة للمراجعة القريبة واليومية (الماضي القريب)" : "مخصصة للمراجعة التراكمية البعيدة"}</p>
           <div className="grid gap-3">
-            <div><label className="text-xs font-bold">التاريخ</label><input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+            <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><div className={`mt-1.5 text-[11px] px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 ${getDayType(reviewForm.date, plan).type==="recitation" ? "bg-[#E7EFE7] border-[#A5D6A7] text-[#1F5E3A]" : "bg-amber-50 border-amber-200 text-amber-800"}`}><span>📅</span><span className="font-bold">{WEEKDAYS[getWeekday(reviewForm.date)]} {fmtBoth(reviewForm.date)}</span>{getDayType(reviewForm.date, plan).type!=="recitation" && <span>— إجازة → سيُنقل إلى {WEEKDAYS[getWeekday(ensureRecitationDate(reviewForm.date, plan))]} {fmtBoth(ensureRecitationDate(reviewForm.date, plan))}</span>}{getDayType(reviewForm.date, plan).type==="recitation" && <span>✓ يوم تسميع</span>}</div><p className="text-[10px] text-gray-400 mt-1">تلقائي ليوم: {WEEKDAYS[getWeekday(getNextRecitationISO(todayISO(), plan))]} {fmtBoth(getNextRecitationISO(todayISO(), plan))} — إذا وافق إجازة ينتقل لأقرب يوم تسميع</p></div>
             <div><label className="text-xs font-bold">السورة</label>
               <select value={reviewForm.surahNumber} onChange={e => { const n = Number(e.target.value); const s = SURAHS.find(x => x.number === n)!; setReviewForm({ ...reviewForm, surahNumber: n, fromAyah: 1, toAyah: Math.min(10, s.ayahCount) }) }} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
                 {[...SURAHS].reverse().map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
