@@ -2496,19 +2496,11 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
             <p className="text-[11px] text-gray-500 mt-1">سيظهر المطلوب منك هنا فور تسجيل المعلم لأول تسميع</p>
           </div>
         )}
-
-        {/* إحصائيات سريعة + زر الخطة السنوية بجانبها */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-          <MiniStat label="مقدار الحفظ" value={formatWajh(totalAyah)} />
-          <MiniStat label="مقدار المراجعة" value={formatWajh(totalReview)} />
-          <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
-          <MiniStat label="عدد الملاحظات" value={String(student.notes.length)} />
-          <button onClick={()=> setShowPlanPage(true)} className="bg-white rounded-xl border-2 border-[#1F5E3A]/20 hover:border-[#1F5E3A] hover:bg-[#E7EFE7]/50 p-3 text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
-            <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{background:"#1F5E3A", color:"white"}}>📅</span>
-            <span className="text-[11px] font-black" style={{color:"#1F5E3A"}}>الخطة السنوية</span>
-            <span className="text-[10px] font-bold text-gray-500 group-hover:text-[#1F5E3A]">عرض كامل ←</span>
-          </button>
-        </div>
+        <button onClick={()=> setShowPlanPage(true)} className="w-full bg-white rounded-xl border-2 border-[#1F5E3A]/20 hover:border-[#1F5E3A] hover:bg-[#E7EFE7]/50 p-3.5 text-center transition group flex items-center justify-center gap-2 shadow-sm">
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{background:"#1F5E3A", color:"white"}}>📅</span>
+          <span className="text-[11px] font-black" style={{color:"#1F5E3A"}}>الخطة السنوية — عرض كامل</span>
+          <span className="text-[10px] font-bold text-gray-500 group-hover:text-[#1F5E3A]">←</span>
+        </button>
 
         {/* ===== تبويب السجل السابق — تبويب واحد يجمع الكل مع فلتر داخلي — ألوان موحدة ===== */}
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
@@ -2873,14 +2865,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           {!isValidWa && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2 leading-5">⚠️ رقم جوال ولي الأمر غير صحيح أو غير مدخل — سيُفتح واتساب للمشاركة العامة. أدخل رقم 05XXXXXXXX في تعديل الطالب ليُرسل مباشرة لولي الأمر.</p>}
           {(() => { const _visitedToday = (student.visitLog || []).some(v => v.date === todayISO()); return (<div className="mt-3 flex flex-col gap-1"><span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border w-fit ${ _visitedToday ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}><span className={`w-1.5 h-1.5 rounded-full ${ _visitedToday ? "bg-emerald-500" : "bg-amber-500"}`}></span>{_visitedToday ? "✓ زار رابط المتابعة اليوم" : "○ لم يزر رابط المتابعة اليوم"}</span><span className="text-[10px] text-gray-400">يتجدد تلقائياً كل يوم — يظهر "زار" فقط إذا دخل ولي الأمر رابط المتابعة خلال اليوم الحالي</span></div>)})()}
         </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <MiniStat label="مقدار الحفظ" value={formatWajh(totalAyah)} />
-          <MiniStat label="مقدار المراجعة" value={formatWajh(totalReview)} />
-          <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
-          <MiniStat label="عدد الأخطاء" value={String(student.errorsLog.length)} />
-        </div>
+        {/* تم حذف المربعات الأربعة (مقدار الحفظ/المراجعة/نسبة الامتياز/عدد الأخطاء) بناءً على طلب المستخدم */}
 
         {/* إحصائيات أوجه دقيقة — تحسب من الآيات ثم تحول لوجه مع كسور ربع/نصف/ثلاثة أرباع */}
         {(() => {
