@@ -1976,6 +1976,8 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
   const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
   const [newGrade, setNewGrade] = React.useState<Grade>("ممتاز")
+  const [editingEntry, setEditingEntry] = React.useState<{id:string; type:"mem"|"small"|"large"} | null>(null)
+  const [editForm, setEditForm] = React.useState<{surahNumber:number; fromAyah:number; toAyah:number; date:string; grade:Grade; notes:string}>({surahNumber:114, fromAyah:1, toAyah:6, date:todayISO(), grade:"بدون تقدير", notes:""})
   const [showPlanPage, setShowPlanPage] = React.useState(false)
 
   // السجلات السابقة = كل السجلات ما عدا الأحدث لكل نوع
@@ -2271,6 +2273,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
   const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
   const [newGrade, setNewGrade] = React.useState<Grade>("ممتاز")
+  const [editingEntry, setEditingEntry] = React.useState<{id:string; type:"mem"|"small"|"large"} | null>(null)
+  const [editForm, setEditForm] = React.useState<{surahNumber:number; fromAyah:number; toAyah:number; date:string; grade:Grade; notes:string}>({surahNumber:114, fromAyah:1, toAyah:6, date:todayISO(), grade:"بدون تقدير", notes:""})
   const latestMem = React.useMemo(() => {
     if (!student.memorizationLog.length) return null
     return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as MemorizationEntry
@@ -2375,7 +2379,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                     </div>
                     {!readOnly && (
                       <div className="flex gap-1.5 mt-2">
-                        <button onClick={() => { setEditingGrade({ id: latestMem.id, type: "mem", current: latestMem.grade }); setNewGrade(latestMem.grade); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل التقدير</button>
+                        <button onClick={() => { setEditingEntry({id: latestMem.id, type:"mem"}); setEditForm({surahNumber: latestMem.surahNumber, fromAyah: latestMem.fromAyah, toAyah: latestMem.toAyah, date: latestMem.date, grade: latestMem.grade, notes: latestMem.notes||""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
                         <button onClick={() => { if (confirm("حذف هذا الحفظ؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== latestMem.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
                       </div>
                     )}
@@ -2406,7 +2410,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                     </div>
                     {!readOnly && (
                       <div className="flex gap-1.5 mt-2">
-                        <button onClick={() => { setEditingGrade({ id: latestSmall.id, type: "small", current: latestSmall.grade }); setNewGrade(latestSmall.grade); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل التقدير</button>
+                        <button onClick={() => { setEditingEntry({id: latestSmall.id, type:"small"}); setEditForm({surahNumber: latestSmall.surahNumber, fromAyah: latestSmall.fromAyah, toAyah: latestSmall.toAyah, date: latestSmall.date, grade: latestSmall.grade, notes:""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
                         <button onClick={() => { if (confirm("حذف هذه المراجعة الصغرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestSmall.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
                       </div>
                     )}
@@ -2437,7 +2441,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                     </div>
                     {!readOnly && (
                       <div className="flex gap-1.5 mt-2">
-                        <button onClick={() => { setEditingGrade({ id: latestLarge.id, type: "large", current: latestLarge.grade }); setNewGrade(latestLarge.grade); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل التقدير</button>
+                        <button onClick={() => { setEditingEntry({id: latestLarge.id, type:"large"}); setEditForm({surahNumber: latestLarge.surahNumber, fromAyah: latestLarge.fromAyah, toAyah: latestLarge.toAyah, date: latestLarge.date, grade: latestLarge.grade, notes:""}); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>
                         <button onClick={() => { if (confirm("حذف هذه المراجعة الكبرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestLarge.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
                       </div>
                     )}
@@ -2500,7 +2504,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
-                          {!readOnly && <button onClick={() => { setEditingGrade({ id: e.id, type: "mem", current: e.grade }); setNewGrade(e.grade); }} className="text-[11px] px-2 py-1 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>}
+                          {!readOnly && <button onClick={() => { setEditingEntry({id:e.id, type:"mem"}); setEditForm({surahNumber:e.surahNumber, fromAyah:e.fromAyah, toAyah:e.toAyah, date:e.date, grade:e.grade, notes:(e as any).notes||""}); }} className="text-[11px] px-2 py-1 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>}
                           {!readOnly && <button onClick={() => { if (confirm("حذف التسجيل؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== e.id) }) }} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
                         </div>
                       </div>
@@ -2520,7 +2524,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
-                          {!readOnly && <button onClick={() => { const rt = (e as ReviewEntry).reviewType; setEditingGrade({ id: e.id, type: rt as any, current: e.grade }); setNewGrade(e.grade); }} className="text-[11px] px-2 py-1 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>}
+                          {!readOnly && <button onClick={() => { const rt = (e as ReviewEntry).reviewType; setEditingEntry({id:e.id, type:rt as any}); setEditForm({surahNumber:e.surahNumber, fromAyah:e.fromAyah, toAyah:e.toAyah, date:e.date, grade:e.grade, notes:""}); }} className="text-[11px] px-2 py-1 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>}
                           {!readOnly && <button onClick={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
                         </div>
                       </div>
@@ -2583,18 +2587,56 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
 
 
-        {/* Modal تعديل التقدير — يسمح للمعلم بالرجوع وتقييم أي تسجيل سابق بدون تقدير */}
-        {editingGrade && (
+        {/* Modal تعديل شامل — يسمح بتعديل السورة والآيات واليوم والتقدير وكل شيء */}
+        {editingEntry && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setEditingEntry(null)} />
+            <div className="relative bg-white w-full max-w-md rounded-2xl shadow-xl border p-5 max-h-[90vh] overflow-auto">
+              <h3 className="font-black text-sm mb-1" style={{color:"#163F27"}}>تعديل {editingEntry.type==="mem" ? "الحفظ" : editingEntry.type==="small" ? "المراجعة الصغرى" : "المراجعة الكبرى"}</h3>
+              <p className="text-xs text-gray-500 mb-3">عدّل السورة والآيات واليوم والتقدير — كل شيء</p>
+              <div className="grid gap-3">
+                <div><label className="text-xs font-bold">السورة</label>
+                  <select value={editForm.surahNumber} onChange={e => { const n = Number(e.target.value); const s = SURAHS.find(x => x.number === n)!; setEditForm(f => ({ ...f, surahNumber: n, fromAyah: 1, toAyah: Math.min(f.toAyah, s.ayahCount) })); }} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm max-h-[200px]">
+                    {[...SURAHS].reverse().map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
+                  </select></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-xs font-bold">من آية</label><input type="number" value={editForm.fromAyah} onChange={e => setEditForm({ ...editForm, fromAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+                  <div><label className="text-xs font-bold">إلى آية</label><input type="number" value={editForm.toAyah} onChange={e => setEditForm({ ...editForm, toAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+                </div>
+                <div><label className="text-xs font-bold">التاريخ — يوم التسميع</label><input type="date" value={editForm.date} onChange={e => setEditForm({ ...editForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><div className={`mt-1.5 text-[11px] px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 ${getDayType(editForm.date, plan).type==="recitation" ? "bg-[#E7EFE7] border-[#A5D6A7] text-[#1F5E3A]" : "bg-amber-50 border-amber-200 text-amber-800"}`}><span>📅</span><span className="font-bold">{fmtBoth(editForm.date)}</span>{getDayType(editForm.date, plan).type!=="recitation" && <span>— إجازة → سيُنقل إلى {fmtBoth(ensureRecitationDate(editForm.date, plan))}</span>}{getDayType(editForm.date, plan).type==="recitation" && <span>✓ يوم تسميع</span>}</div></div>
+                <div><label className="text-xs font-bold">التقدير</label>
+                  <select value={editForm.grade} onChange={e => setEditForm({ ...editForm, grade: e.target.value as Grade })} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
+                    {GRADES.map(g => <option key={g} value={g}>{g === "بدون تقدير" ? "بدون تقدير — بانتظار التسميع" : g}</option>)}
+                  </select></div>
+                {editingEntry.type==="mem" && <div><label className="text-xs font-bold">ملاحظات</label><input value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} placeholder="اختياري" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm" /></div>}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => {
+                  if (!editingEntry) return
+                  const s = SURAHS.find(x => x.number === editForm.surahNumber)!
+                  if (editForm.fromAyah < 1 || editForm.toAyah > s.ayahCount || editForm.fromAyah > editForm.toAyah) { alert("تحقق من رقم الآيات"); return }
+                  const effectiveDate = ensureRecitationDate(editForm.date, plan)
+                  if (editingEntry.type === "mem") {
+                    const updated = { ...student, memorizationLog: student.memorizationLog.map(x => x.id === editingEntry.id ? { ...x, surahNumber: s.number, surahName: s.name, fromAyah: editForm.fromAyah, toAyah: editForm.toAyah, ayahCount: editForm.toAyah - editForm.fromAyah + 1, date: effectiveDate, grade: editForm.grade, notes: editForm.notes } : x) }
+                    onUpdate(updated)
+                  } else {
+                    const updated = { ...student, reviewLog: student.reviewLog.map(x => x.id === editingEntry.id ? { ...x, surahNumber: s.number, surahName: s.name, fromAyah: editForm.fromAyah, toAyah: editForm.toAyah, ayahCount: editForm.toAyah - editForm.fromAyah + 1, date: effectiveDate, grade: editForm.grade } : x) }
+                    onUpdate(updated)
+                  }
+                  setEditingEntry(null)
+                }} className="flex-1 py-2.5 rounded-xl bg-[#1F5E3A] text-white font-bold text-sm">حفظ التعديلات</button>
+                <button onClick={() => setEditingEntry(null)} className="flex-1 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">إلغاء</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* إبقاء modal القديم للتوافق في حال بقي زر قديم يستخدمه */}
+        {editingGrade && !editingEntry && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40" onClick={() => setEditingGrade(null)} />
             <div className="relative bg-white w-full max-w-sm rounded-2xl shadow-xl border p-5">
               <h3 className="font-black text-sm mb-3" style={{color:"#163F27"}}>تعديل التقدير</h3>
-              <p className="text-xs text-gray-500 mb-3">اختر التقدير الجديد — يمكنك التعديل حتى بعد الحفظ بدون تقدير</p>
-              <div className="mb-3 p-2 bg-[#FAF9F4] rounded-xl border text-xs">
-                <span className="text-gray-500">الحالي:</span> <span className="font-bold px-2 py-0.5 rounded-full text-white text-[11px]" style={{background: GRADE_COLOR[editingGrade.current]}}>{editingGrade.current}</span>
-                <span className="text-gray-400 mx-1">→</span>
-                <span className="font-bold px-2 py-0.5 rounded-full text-white text-[11px]" style={{background: GRADE_COLOR[newGrade]}}>{newGrade}</span>
-              </div>
+              <p className="text-xs text-gray-500 mb-3">اختر التقدير الجديد</p>
               <select value={newGrade} onChange={e => setNewGrade(e.target.value as Grade)} className="w-full px-3 py-2.5 rounded-xl border bg-white text-sm">
                 {GRADES.map(g => <option key={g} value={g}>{g === "بدون تقدير" ? "بدون تقدير — بانتظار التسميع" : g}</option>)}
               </select>
