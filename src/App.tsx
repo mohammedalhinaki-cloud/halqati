@@ -1213,14 +1213,16 @@ export default function App() {
           </div>
         )}
 
-        {/* Toolbar - أزرار متناسقة تغطي المستطيل الأبيض */}
+        {/* Toolbar - أزرار متناسقة تغطي المستطيل الأبيض — قائمة كل الحلقات مخفية عن المعلم */}
         <div className="bg-white rounded-2xl border border-[#E1E5DA] p-4 mb-5 shadow-sm space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className={currentUser?.role === "teacher" ? "" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
+            {currentUser?.role !== "teacher" && (
             <select value={filterCircle} onChange={e => setFilterCircle(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-[#E1E5DA] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1F5E3A]">
               <option value="all">كل الحلقات</option>
               {circles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               <option value="">بدون حلقة</option>
             </select>
+            )}
             <div className="relative">
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الجوال..." className="w-full pr-10 pl-4 py-3 rounded-xl border border-[#E1E5DA] text-sm focus:outline-none focus:ring-2 focus:ring-[#1F5E3A]" />
               <span className="absolute right-3 top-3 text-gray-400">🔍</span>
