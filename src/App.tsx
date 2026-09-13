@@ -144,7 +144,7 @@ CREATE POLICY "Public access halqati_attendance" ON halqati_attendance FOR ALL U
 SELECT 'تم إنشاء جداول نظام حلقتي بنجاح!' AS status;`
 
 const FALLBACK_SUPABASE_URL = "https://fwkksiilsdmxlwxdozku.supabase.co"
-const FALLBACK_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3a2tzaWlsc2RteGx3eGRvemt1Iiwicm9sIjoiYW5vbiIsImlhdCI6MTc4OTE0OTU3MywiZXhwIjoyMTA0NzI1NTczMH0.EOewtAxaKIMBT4JNLupfPR0MoFOobWGB3yDcPyJIJ8k"
+const FALLBACK_SUPABASE_ANON_KEY = "sb_publishable_bL6693qB1xVakTch0Cchag_GI-m50Uy"
 function getSupabaseConfig() {
   const url = (import.meta as any).env?.VITE_SUPABASE_URL || localStorage.getItem("halqati_supabase_url") || FALLBACK_SUPABASE_URL
   const anonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || localStorage.getItem("halqati_supabase_anon_key") || FALLBACK_SUPABASE_ANON_KEY
