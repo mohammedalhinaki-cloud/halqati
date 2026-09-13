@@ -1299,7 +1299,7 @@ export default function App() {
                     return (
                       <div key={cid} className="border rounded-xl overflow-hidden">
                         <div className="px-3 py-2 bg-[#1F5E3A] text-white flex items-center justify-between">
-                          <span className="font-bold text-xs">📚 {cname}</span>
+                          <span className="font-bold text-xs"> {cname}</span>
                           <span className="text-[11px] bg-white/20 px-2 py-0.5 rounded-full">{list.length} طالب ممتاز</span>
                         </div>
                         <div className="divide-y">
@@ -1476,7 +1476,7 @@ export default function App() {
 
         {visibleStudents.length === 0 ? (
           <div className="bg-white rounded-2xl border border-dashed border-[#E1E5DA] p-10 text-center">
-            <p className="text-3xl mb-2">📖</p>
+            <p className="text-3xl mb-2"></p>
             <p className="font-bold text-sm" style={{ color: "#5B6459" }}>لا يوجد طلاب مطابقون للبحث</p>
             <p className="text-xs text-gray-400 mt-1">أضف طالباً جديداً أو غيّر الفلتر</p>
           </div>
@@ -1930,7 +1930,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   const totalReview = student.reviewLog.reduce((a,b)=>a+b.ayahCount,0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x=>x.grade==="ممتاز").length / student.memorizationLog.length * 100) : 0
 
-  // آخر سجل هو المطلوب الحالي (حسب اختيار المستخدم)
+  // آخر سجل  (حسب اختيار المستخدم)
   const latestMem = React.useMemo(() => {
     if (!student.memorizationLog.length) return null
     return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as MemorizationEntry
@@ -2041,8 +2041,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <p className="text-2xl mb-1">📭</p>
-                  <p className="text-xs font-bold text-gray-600">لا يوجد حفظ جديد مسجل</p>
+                                    <p className="text-xs font-bold text-gray-600">لا يوجد حفظ جديد مسجل</p>
                   <p className="text-[11px] text-gray-400 mt-1 leading-5">تابع مع المعلم لمعرفة المقطع القادم</p>
                 </div>
               )}
@@ -2068,8 +2067,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <p className="text-2xl mb-1">📭</p>
-                  <p className="text-xs font-bold text-gray-600">لا توجد مراجعة صغرى</p>
+                                    <p className="text-xs font-bold text-gray-600">لا توجد مراجعة صغرى</p>
                   <p className="text-[11px] text-gray-400 mt-1">الماضي القريب — ستظهر هنا عند التسجيل</p>
                 </div>
               )}
@@ -2095,8 +2093,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                 </div>
               ) : (
                 <div className="text-center py-4">
-                  <p className="text-2xl mb-1">📭</p>
-                  <p className="text-xs font-bold text-gray-600">لا توجد مراجعة كبرى</p>
+                                    <p className="text-xs font-bold text-gray-600">لا توجد مراجعة كبرى</p>
                   <p className="text-[11px] text-gray-400 mt-1">الماضي البعيد — ستظهر هنا عند التسجيل</p>
                 </div>
               )}
@@ -2154,7 +2151,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                     return (
                       <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4]/60 hover:bg-white transition">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>📖</span>
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
                             <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
@@ -2170,7 +2167,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                     return (
                       <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-[#FAF9F4]/50 transition">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>{isSmall ? "🔁" : "📚"}</span>
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
                             <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
@@ -2317,16 +2314,23 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
         {/* ===== المطلوب غداً — آخر تسجيل لكل نوع في مكان واحد (بدون اسم المعلم) ===== */}
         <div className="space-y-3">
+          {!readOnly && (
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={onAddMem} className="py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ حفظ جديد</button>
+              <button onClick={onAddSmall} className="py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ صغرى</button>
+              <button onClick={onAddLarge} className="py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ كبرى</button>
+            </div>
+          )}
+
           <div className="bg-[#1F5E3A] rounded-2xl p-4 shadow-sm text-center">
             <h4 className="font-black text-sm text-white">المطلوب غداً</h4>
-            <p className="text-[11px] text-white/70 mt-1">آخر حفظ وآخر مراجعة صغرى وكبرى — هو المطلوب الحالي</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-3">
             {/* حفظ جديد */}
             <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMem ? "#1F5E3A" : "#E1E5DA"}}>
               <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMem ? "#1F5E3A" : "#F3F4F6"}}>
-                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>📖 حفظ جديد</p>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>حفظ جديد</p>
                 {latestMem && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestMem.ayahCount} آية</span>}
               </div>
               <div className="p-3">
@@ -2342,7 +2346,6 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-2xl mb-1">📭</p>
                     <p className="text-xs font-bold text-gray-600">لا يوجد حفظ مسجل</p>
                     <p className="text-[11px] text-gray-400 mt-1">سيظهر هنا عند التسجيل</p>
                   </div>
@@ -2353,7 +2356,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             {/* مراجعة صغرى */}
             <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmall ? "#1F5E3A" : "#E1E5DA"}}>
               <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmall ? "#1F5E3A" : "#F3F4F6"}}>
-                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>🔁 مراجعة صغرى</p>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>مراجعة صغرى</p>
                 {latestSmall && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmall.ayahCount} آية</span>}
               </div>
               <div className="p-3">
@@ -2369,7 +2372,6 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-2xl mb-1">📭</p>
                     <p className="text-xs font-bold text-gray-600">لا توجد مراجعة صغرى</p>
                     <p className="text-[11px] text-gray-400 mt-1">الماضي القريب</p>
                   </div>
@@ -2380,7 +2382,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             {/* مراجعة كبرى */}
             <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarge ? "#1F5E3A" : "#E1E5DA"}}>
               <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarge ? "#1F5E3A" : "#F3F4F6"}}>
-                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>📚 مراجعة كبرى</p>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>مراجعة كبرى</p>
                 {latestLarge && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarge.ayahCount} آية</span>}
               </div>
               <div className="p-3">
@@ -2396,7 +2398,6 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                   </div>
                 ) : (
                   <div className="text-center py-4">
-                    <p className="text-2xl mb-1">📭</p>
                     <p className="text-xs font-bold text-gray-600">لا توجد مراجعة كبرى</p>
                     <p className="text-[11px] text-gray-400 mt-1">الماضي البعيد</p>
                   </div>
@@ -2412,13 +2413,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             </div>
           )}
 
-          {!readOnly && (
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={onAddMem} className="py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ حفظ جديد</button>
-              <button onClick={onAddSmall} className="py-2.5 rounded-xl bg-white border-2 border-[#1F5E3A] text-[#1F5E3A] text-xs font-bold hover:bg-[#E7EFE7]">+ صغرى</button>
-              <button onClick={onAddLarge} className="py-2.5 rounded-xl bg-white border-2 border-[#1F5E3A] text-[#1F5E3A] text-xs font-bold hover:bg-[#E7EFE7]">+ كبرى</button>
-            </div>
-          )}
+
         </div>
 
         {/* ===== السجل السابق — كل القديم في مكان واحد (بدون اسم المعلم) ===== */}
@@ -2451,7 +2446,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                     return (
                       <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4]/60 hover:bg-white transition">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>📖</span>
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
                             <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
@@ -2470,7 +2465,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                     return (
                       <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-[#FAF9F4]/50 transition">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>{isSmall ? "🔁" : "📚"}</span>
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
                             <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
