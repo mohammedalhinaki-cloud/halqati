@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js"
 
 // ===================== أنواع البيانات =====================
 type Role = "owner" | "admin" | "supervisor" | "teacher"
-type Grade = "ممتاز" | "جيد" | "يحتاج إعادة"
+type Grade = "ممتاز" | "جيد" | "يحتاج إعادة" | "بدون تقدير"
 type ReviewType = "small" | "large"
 type ErrorType = "خطأ في الحفظ" | "نسيان" | "تردد" | "خطأ تجويد" | "تلقين"
 
@@ -68,8 +68,8 @@ const SURAHS: { number: number; name: string; ayahCount: number }[] = [
   [111, "المسد", 5], [112, "الإخلاص", 4], [113, "الفلق", 5], [114, "الناس", 6],
 ].map(([n, name, ayah]) => ({ number: Number(n), name: String(name), ayahCount: Number(ayah) }))
 
-const GRADES: Grade[] = ["ممتاز", "جيد", "يحتاج إعادة"]
-const GRADE_COLOR: Record<string, string> = { "ممتاز": "#1F5E3A", "جيد": "#C9A227", "يحتاج إعادة": "#B3492C", "جيد جدًا": "#3F8F5F" }
+const GRADES: Grade[] = ["بدون تقدير", "ممتاز", "جيد", "يحتاج إعادة"]
+const GRADE_COLOR: Record<string, string> = { "ممتاز": "#1F5E3A", "جيد": "#C9A227", "يحتاج إعادة": "#B3492C", "جيد جدًا": "#3F8F5F", "بدون تقدير": "#9CA3AF" }
 const ERROR_TYPES: ErrorType[] = ["خطأ في الحفظ", "نسيان", "تردد", "خطأ تجويد", "تلقين"]
 const ROLE_LABEL: Record<Role, string> = { owner: "المالك الرئيسي", admin: "المدير", supervisor: "المشرف", teacher: "المعلم" }
 const WEEKDAYS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
@@ -415,9 +415,9 @@ export default function App() {
 
   // Add logs modals
   const [showMemModal, setShowMemModal] = useState(false)
-  const [memForm, setMemForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "ممتاز" as Grade, date: todayISO(), notes: "" })
+  const [memForm, setMemForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "بدون تقدير" as Grade, date: todayISO(), notes: "" })
   const [showReviewModal, setShowReviewModal] = useState<ReviewType | null>(null)
-  const [reviewForm, setReviewForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "ممتاز" as Grade, date: todayISO() })
+  const [reviewForm, setReviewForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "بدون تقدير" as Grade, date: todayISO() })
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorForm, setErrorForm] = useState({ type: "خطأ في الحفظ" as ErrorType, description: "", date: todayISO() })
   const [showNoteModal, setShowNoteModal] = useState(false)
@@ -1637,7 +1637,7 @@ export default function App() {
             </div>
             <div><label className="text-xs font-bold">التقدير</label>
               <select value={memForm.grade} onChange={e => setMemForm({ ...memForm, grade: e.target.value as Grade })} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
-                {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                {GRADES.map(g => <option key={g} value={g}>{g === "بدون تقدير" ? "بدون تقدير — بانتظار التسميع (افتراضي)" : g}</option>)}
               </select></div>
             <div><label className="text-xs font-bold">ملاحظات</label><input value={memForm.notes} onChange={e => setMemForm({ ...memForm, notes: e.target.value })} placeholder="اختياري" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm" /></div>
           </div>
@@ -1660,7 +1660,7 @@ export default function App() {
             </div>
             <div><label className="text-xs font-bold">التقدير</label>
               <select value={reviewForm.grade} onChange={e => setReviewForm({ ...reviewForm, grade: e.target.value as Grade })} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
-                {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                {GRADES.map(g => <option key={g} value={g}>{g === "بدون تقدير" ? "بدون تقدير — بانتظار التسميع (افتراضي)" : g}</option>)}
               </select></div>
           </div>
           <div className="flex gap-2 mt-4"><button onClick={handleAddReview} className="flex-1 py-2.5 rounded-xl bg-[#1F5E3A] text-white font-bold text-sm">حفظ المراجعة</button><button onClick={() => setShowReviewModal(null)} className="flex-1 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">إلغاء</button></div>
