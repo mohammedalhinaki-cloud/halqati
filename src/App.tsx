@@ -1268,16 +1268,17 @@ export default function App() {
             ))}
           </div>
         )}
-        {/* تبويب المدير — الطلاب الحاصلون على ممتاز مرتبون حسب الحلقات (للمدير فقط) */}
+        {/* تبويب المدير — الطلاب الحاصلون على ممتاز اليوم فقط (يتجدد يومياً) */}
         {currentUser?.role === "admin" && (
           <div className="bg-white rounded-2xl border border-[#E1E5DA] shadow-sm overflow-hidden mb-6">
             <div className="px-4 py-3 border-b bg-[#FAF9F4]/60 flex items-center justify-between">
-              <h3 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>🏆 الطلاب الحاصلون على ممتاز <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#C9A227]/15 text-[#7a5a00] border border-[#C9A227]/30">{visibleStudents.filter(s=>[...s.memorizationLog, ...s.reviewLog].some((e:any)=>e.grade==="ممتاز")).length} طالب</span></h3>
-              <span className="text-[11px] text-gray-500">مرتبون حسب الحلقة</span>
+              <h3 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>🏆 الطلاب الحاصلون على ممتاز اليوم <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#C9A227]/15 text-[#7a5a00] border border-[#C9A227]/30">{visibleStudents.filter(s=>[...s.memorizationLog, ...s.reviewLog].some((e:any)=>e.date===todayISO() && e.grade==="ممتاز")).length} طالب • {fmtBoth(todayISO())}</span></h3>
+              <span className="text-[11px] text-gray-500">يتجدد يومياً • لا يحسب الأيام السابقة</span>
             </div>
             {(() => {
-              const excellent = visibleStudents.filter(s=>[...s.memorizationLog, ...s.reviewLog].some((e:any)=>e.grade==="ممتاز"))
-              if (excellent.length===0) return <p className="text-xs text-gray-400 text-center py-8">لا يوجد طلاب حاصلون على ممتاز حالياً</p>
+              const today = todayISO()
+              const excellent = visibleStudents.filter(s=>[...s.memorizationLog, ...s.reviewLog].some((e:any)=>e.date===today && e.grade==="ممتاز"))
+              if (excellent.length===0) return <p className="text-xs text-gray-400 text-center py-8">لا يوجد طلاب حاصلون على ممتاز اليوم — يتجدد كل يوم تلقائياً</p>
               const grouped = new Map<string, typeof excellent>()
               excellent.forEach(s=> {
                 const k = s.circleId || "__none"
@@ -1304,18 +1305,28 @@ export default function App() {
                         </div>
                         <div className="divide-y">
                           {list.map(s=>{
-                            const excCount = [...s.memorizationLog, ...s.reviewLog].filter((e:any)=>e.grade==="ممتاز").length
-                            const lastExc = [...s.memorizationLog, ...s.reviewLog].filter((e:any)=>e.grade==="ممتاز").sort((a:any,b:any)=> b.date.localeCompare(a.date))[0]
+                            const getLastActual = (logs:any[]) => {
+                              const actual = logs.filter((e:any)=>e.grade!=="بدون تقدير")
+                              if(!actual.length) return null
+                              return actual.sort((a:any,b:any)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0]
+                            }
+                            const lastMemActual = getLastActual(s.memorizationLog)
+                            const lastSmallActual = getLastActual(s.reviewLog.filter((x:any)=>x.reviewType==="small"))
+                            const lastLargeActual = getLastActual(s.reviewLog.filter((x:any)=>x.reviewType==="large"))
                             return (
                               <div key={s.id} onClick={()=> setSelectedStudentId(s.id)} className="flex items-center justify-between p-2.5 hover:bg-[#FAF9F4] cursor-pointer transition">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-white text-xs" style={{background:"#C9A227"}}>{s.name.trim().charAt(0)}</div>
+                                  <div className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-white text-xs" style={{background:"#1F5E3A"}}>{s.name.trim().charAt(0)}</div>
                                   <div>
                                     <p className="font-bold text-xs" style={{color:"#163F27"}}>{s.name}</p>
-                                    <p className="text-[11px] text-gray-500">{lastExc ? `${(lastExc as any).surahName || ""} • ${fmtBoth((lastExc as any).date)} • ${excCount} مرة ممتاز` : `${excCount} مرة ممتاز`}</p>
+                                    <p className="text-[11px] text-gray-500">{circles.find(c=>c.id===s.circleId)?.name || "بدون حلقة"} • {fmtBoth(today)}</p>
                                   </div>
                                 </div>
-                                <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white shrink-0" style={{background:"#1F5E3A"}}>ممتاز ★</span>
+                                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end max-w-[55%]">
+                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{background: lastMemActual ? GRADE_COLOR[lastMemActual.grade] : "#9CA3AF"}}>{lastMemActual ? `حفظ: ${lastMemActual.grade}` : "حفظ: —"}</span>
+                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{background: lastSmallActual ? GRADE_COLOR[lastSmallActual.grade] : "#9CA3AF"}}>{lastSmallActual ? `صغرى: ${lastSmallActual.grade}` : "صغرى: —"}</span>
+                                  <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{background: lastLargeActual ? GRADE_COLOR[lastLargeActual.grade] : "#9CA3AF"}}>{lastLargeActual ? `كبرى: ${lastLargeActual.grade}` : "كبرى: —"}</span>
+                                </div>
                               </div>
                             )
                           })}
@@ -1490,7 +1501,7 @@ export default function App() {
                 <div key={s.id} onClick={() => setSelectedStudentId(s.id)} className="bg-white rounded-2xl border border-[#E1E5DA] p-4 shadow-sm hover:shadow-md hover:border-[#1F5E3A]/20 cursor-pointer transition group">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white" style={{ background: GRADE_COLOR[lastGrade as Grade] || "#E7EFE7", color: lastGrade ? "#fff" : "#1F5E3A" }}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white" style={{ background: "#1F5E3A", color: "#fff" }}>
                         {s.name.trim().charAt(0)}
                       </div>
                       <div>
@@ -1498,10 +1509,7 @@ export default function App() {
                         <p className="text-[11px] text-gray-500">{circleName2} • {s.phone || "—"}</p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      {lastGrade && <span className="text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[lastGrade] }}>{lastGrade}</span>}
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full border flex items-center gap-1 ${hasVisitedToday(s) ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>{hasVisitedToday(s) ? "✓ زار اليوم" : "○ لم يزر"}</span>
-                    </div>
+
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-center mb-3">
