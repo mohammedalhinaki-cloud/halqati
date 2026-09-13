@@ -286,13 +286,7 @@ const decodeStudentFromLink = (b64: string): Student | null => {
 }
 const linkForStudent = (s: Student) => {
   const base = window.location.origin + window.location.pathname.split("?")[0].split("#")[0]
-  const token = s.accessToken
-  const data = encodeStudentForLink(s)
-  // رابط هجين: t للتوافق + d للعرض بدون سحابة (إذا كان طويلاً جداً نرسل t فقط ويعتمد على السحابة)
-  const urlWithData = `${base}?t=${token}&d=${encodeURIComponent(data)}`
-  // إذا كان الرابط أطول من 1800 حرف، نرسل t فقط لتجنب قطع واتساب
-  if (urlWithData.length > 1800) return `${base}?t=${token}`
-  return urlWithData
+  return `${base}?t=${s.accessToken}`
 }
 // helper: هل زار الطالب رابط المتابعة اليوم؟ (يتجدد كل يوم — بدون عدّ تراكمي)
 const hasVisitedToday = (s: Student) => {
@@ -692,19 +686,20 @@ export default function App() {
     }
   }, [])
 
-  // ====== جلب بيانات الطالب لولي الأمر من Supabase إذا لم يوجد محلياً (إصلاح رابط واتساب منتهي) + دعم الرابط المباشر بدون سحابة ======
+  // ====== جلب بيانات الطالب لولي الأمر — رابط دائم يتحدث تلقائياً ======
+  // كان السابق يعرض بيانات snapshot من ?d= ويتوقف، الآن نجعل ?d= مجرد عرض فوري ثم نجلب الأحدث من السحابة فوراً ونبقى نحدث لحظياً
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const t = params.get("t")
     const d = params.get("d")
     if (!t) return
-    // إذا كان الرابط يحمل بيانات مباشرة، استخدمها فوراً بدون انتظار Supabase
+    // إذا كان الرابط يحمل بيانات مباشرة، استخدمها كعرض فوري فقط (لا نعود)
     if (d) {
       try {
         const decoded = decodeStudentFromLink(decodeURIComponent(d))
         if (decoded && decoded.accessToken === t) {
           setParentCloudStudent(decoded)
-          // سجل زيارة يومية محلياً
+          // سجل زيارة يومية محلياً (لكن سنحدّثها من السحابة بعد قليل)
           const today = todayISO()
           const alreadyVisited = (decoded.visitLog || []).some((v: any) => v.date === today)
           if (!alreadyVisited) {
@@ -712,17 +707,11 @@ export default function App() {
             const updated = { ...decoded, visitLog: newVisits }
             setParentCloudStudent(updated)
           }
-          return
         }
       } catch {}
     }
-    // إذا وجد محلياً لا حاجة للجلب
-    const localFound = students.find(x => x.accessToken === t)
-    if (localFound) return
-    try {
-      const raw: any[] = JSON.parse(localStorage.getItem("halqati_students") || "[]")
-      if (raw.find((x: any) => x.accessToken === t)) return
-    } catch {}
+    // حتى لو وجد محلياً أو عبر ?d=، نجلب الأحدث من السحابة لإبقاء الرابط دائماً محدثاً
+    // لا نعود مبكراً — نجلب من السحابة دائماً
     const sb = getSupabase()
     if (!sb) return
     setParentCloudLoading(true)
@@ -2300,38 +2289,87 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
 }
 
 function ParentTokenView({ student, circles, staff, attendance, plan }: { student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; plan: AcademicPlan }) {
-  const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
-  const totalAyah = student.memorizationLog.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
-  const totalReview = student.reviewLog.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
-  const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x=>x.grade==="ممتاز").length / student.memorizationLog.length * 100) : 0
+  // === رابط دائم — تحديث لحظي من السحابة (كل تسجيل جديد يظهر تلقائياً بدون رابط جديد) ===
+  const [liveStudent, setLiveStudent] = useState<Student>(student)
+  const [lastSync, setLastSync] = useState<string>(new Date().toISOString())
+  const [isLive, setIsLive] = useState<boolean>(false)
+  useEffect(() => { setLiveStudent(student) }, [student])
+  useEffect(() => {
+    const token = liveStudent.accessToken
+    if (!token) return
+    const sb = getSupabase()
+    if (!sb) return
+    let cancelled = false
+    const toStudent = (row: any): Student => ({
+      id: row.id, name: row.name, phone: row.phone || "", circleId: row.circle_id,
+      accessToken: row.access_token, memorizationLog: row.memorization_log || [], reviewLog: row.review_log || [], errorsLog: row.errors_log || [], notes: row.notes || [], visitLog: row.visit_log || []
+    })
+    const fetchFresh = async () => {
+      try {
+        const { data, error } = await sb.from("halqati_students").select("*").eq("access_token", token).maybeSingle()
+        if (!cancelled && data && !error) {
+          const s = toStudent(data)
+          setLiveStudent(prev => {
+            const a = JSON.stringify(prev)
+            const b = JSON.stringify(s)
+            return a === b ? prev : s
+          })
+          setLastSync(new Date().toISOString())
+          setIsLive(true)
+        }
+      } catch {}
+    }
+    fetchFresh()
+    let channel: any = null
+    try {
+      channel = sb.channel(`halqati-parent-`+token)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'halqati_students', filter: `access_token=eq.`+token }, (payload: any) => {
+          if (payload?.new) {
+            const s = toStudent(payload.new)
+            if (!cancelled) { setLiveStudent(s); setLastSync(new Date().toISOString()); setIsLive(true) }
+          } else { fetchFresh() }
+        }).subscribe()
+    } catch {}
+    const interval = setInterval(fetchFresh, 30000)
+    const onFocus = () => fetchFresh()
+    const onVis = () => { if (!document.hidden) fetchFresh() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVis)
+    return () => { cancelled = true; if (channel) try { sb.removeChannel(channel) } catch {}; clearInterval(interval); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onVis) }
+  }, [liveStudent.accessToken])
+  const studentLive = liveStudent
+  const circleName = circles.find(c => c.id === studentLive.circleId)?.name || "بدون حلقة"
+  const totalAyah = studentLive.memorizationLog.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+  const totalReview = studentLive.reviewLog.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+  const excellenceRate = studentLive.memorizationLog.length ? Math.round(studentLive.memorizationLog.filter(x=>x.grade==="ممتاز").length / studentLive.memorizationLog.length * 100) : 0
 
   // آخر سجل — مجمع حسب التاريخ (إصلاح: كل السور بنفس التاريخ تظهر معاً في المطلوب غداً)
   const latestMemDate = React.useMemo(() => {
-    if (!student.memorizationLog.length) return null
-    return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date))[0].date
-  }, [student])
+    if (!studentLive.memorizationLog.length) return null
+    return [...studentLive.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date))[0].date
+  }, [studentLive])
   const latestMems = React.useMemo(() => {
     if (!latestMemDate) return []
-    return student.memorizationLog.filter(x=> x.date === latestMemDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
-  }, [student, latestMemDate])
+    return studentLive.memorizationLog.filter(x=> x.date === latestMemDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [studentLive, latestMemDate])
   const latestSmallDate = React.useMemo(() => {
-    const arr = student.reviewLog.filter(x=> x.reviewType === "small")
+    const arr = studentLive.reviewLog.filter(x=> x.reviewType === "small")
     if (!arr.length) return null
     return [...arr].sort((a,b)=> b.date.localeCompare(a.date))[0].date
-  }, [student])
+  }, [studentLive])
   const latestSmalls = React.useMemo(() => {
     if (!latestSmallDate) return []
-    return student.reviewLog.filter(x=> x.reviewType === "small" && x.date === latestSmallDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
-  }, [student, latestSmallDate])
+    return studentLive.reviewLog.filter(x=> x.reviewType === "small" && x.date === latestSmallDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [studentLive, latestSmallDate])
   const latestLargeDate = React.useMemo(() => {
-    const arr = student.reviewLog.filter(x=> x.reviewType === "large")
+    const arr = studentLive.reviewLog.filter(x=> x.reviewType === "large")
     if (!arr.length) return null
     return [...arr].sort((a,b)=> b.date.localeCompare(a.date))[0].date
-  }, [student])
+  }, [studentLive])
   const latestLarges = React.useMemo(() => {
     if (!latestLargeDate) return []
-    return student.reviewLog.filter(x=> x.reviewType === "large" && x.date === latestLargeDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
-  }, [student, latestLargeDate])
+    return studentLive.reviewLog.filter(x=> x.reviewType === "large" && x.date === latestLargeDate).sort((a,b)=> a.surahNumber - b.surahNumber || a.fromAyah - b.fromAyah)
+  }, [studentLive, latestLargeDate])
   // توافق خلفي للإشارات القديمة
   const latestMem = latestMems[0] || null
   const latestSmall = latestSmalls[0] || null
@@ -2347,15 +2385,15 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   // السجلات السابقة = كل السجلات ما عدا تاريخ المطلوب غداً لكل نوع (إصلاح: كل السور بنفس التاريخ لا تذهب للسابق)
   const previousCombined = React.useMemo(() => {
     const list: Array<{ key: string; type: "mem"|"small"|"large"; date: string; sortKey: string }> = []
-    const memPrev = latestMemDate ? student.memorizationLog.filter(x=> x.date !== latestMemDate) : student.memorizationLog
-    const smallPrev = latestSmallDate ? student.reviewLog.filter(x=> !(x.reviewType==="small" && x.date === latestSmallDate)) : student.reviewLog.filter(x=> x.reviewType==="small")
-    const largePrev = latestLargeDate ? student.reviewLog.filter(x=> !(x.reviewType==="large" && x.date === latestLargeDate)) : student.reviewLog.filter(x=> x.reviewType==="large")
+    const memPrev = latestMemDate ? studentLive.memorizationLog.filter(x=> x.date !== latestMemDate) : studentLive.memorizationLog
+    const smallPrev = latestSmallDate ? studentLive.reviewLog.filter(x=> !(x.reviewType==="small" && x.date === latestSmallDate)) : studentLive.reviewLog.filter(x=> x.reviewType==="small")
+    const largePrev = latestLargeDate ? studentLive.reviewLog.filter(x=> !(x.reviewType==="large" && x.date === latestLargeDate)) : studentLive.reviewLog.filter(x=> x.reviewType==="large")
     memPrev.forEach(e=> list.push({ key: e.id, type: "mem", date: e.date, sortKey: e.date + e.id }))
     smallPrev.forEach(e=> list.push({ key: e.id, type: "small", date: e.date, sortKey: e.date + e.id }))
     largePrev.forEach(e=> list.push({ key: e.id, type: "large", date: e.date, sortKey: e.date + e.id }))
     // رتب تنازلياً حسب التاريخ
     return list.sort((a,b)=> b.sortKey.localeCompare(a.sortKey))
-  }, [student, latestMemDate, latestSmallDate, latestLargeDate])
+  }, [studentLive, latestMemDate, latestSmallDate, latestLargeDate])
 
   const filteredPrev = React.useMemo(() => {
     if (historyFilter === "mem") return previousCombined.filter(x=> x.type==="mem")
@@ -2364,8 +2402,8 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   }, [previousCombined, historyFilter])
 
   // خرائط سريعة للوصول للبيانات
-  const memMap = React.useMemo(()=> new Map(student.memorizationLog.map(e=>[e.id, e])), [student])
-  const reviewMap = React.useMemo(()=> new Map(student.reviewLog.map(e=>[e.id, e])), [student])
+  const memMap = React.useMemo(()=> new Map(studentLive.memorizationLog.map(e=>[e.id, e])), [studentLive])
+  const reviewMap = React.useMemo(()=> new Map(studentLive.reviewLog.map(e=>[e.id, e])), [studentLive])
 
   const hasAnyRequired = !!(latestMems.length || latestSmalls.length || latestLarges.length)
 
@@ -2398,12 +2436,17 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   return (
     <div className="flex-1">
       <div className="max-w-[900px] mx-auto px-4 py-6 space-y-4">
+        {/* رابط دائم — شريط حالة التحديث اللحظي */}
+        <div className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold ${isLive ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+          <span className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${isLive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></span>{isLive ? "● رابط دائم — يتحدّث لحظياً" : "○ جاري المزامنة..."}</span>
+          <span className="text-[10px] font-normal">آخر تحديث: {new Date(lastSync).toLocaleTimeString("ar-SA",{hour:"2-digit",minute:"2-digit"})} • اسحب للأسفل للتحديث • نفس الرابط يبقى لشهور</span>
+        </div>
         {/* بطاقة الطالب — بدون أي هيدر علوي حسب الطلب السابق */}
         <div className="bg-white rounded-2xl border p-5 flex items-center gap-4 shadow-sm">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0" style={{background:"#1F5E3A"}}>{student.name.trim().charAt(0)}</div>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0" style={{background:"#1F5E3A"}}>{studentLive.name.trim().charAt(0)}</div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-black text-lg" style={{color:"#163F27"}}>{student.name}</h3>
-            <p className="text-xs text-gray-500 mt-1 truncate">{circleName} • حفظ: {student.memorizationLog.length} • مراجعة: {student.reviewLog.length} • أخطاء: {student.errorsLog.length}</p>
+            <h3 className="font-black text-lg" style={{color:"#163F27"}}>{studentLive.name}</h3>
+            <p className="text-xs text-gray-500 mt-1 truncate">{circleName} • حفظ: {studentLive.memorizationLog.length} • مراجعة: {studentLive.reviewLog.length} • أخطاء: {studentLive.errorsLog.length}</p>
           </div>
           <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
             <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">متابعة ولي الأمر</span>
@@ -2507,7 +2550,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
         {!hasAnyRequired && (
           <div className="bg-[#FAF9F4] border border-[#E1E5DA] rounded-2xl p-3 text-center">
-            <p className="text-xs font-bold" style={{color:"#163F27"}}>👋 مرحباً {student.name} — لم يسجّل المعلم أي حفظ أو مراجعة بعد</p>
+            <p className="text-xs font-bold" style={{color:"#163F27"}}>👋 مرحباً {studentLive.name} — لم يسجّل المعلم أي حفظ أو مراجعة بعد</p>
             <p className="text-[11px] text-gray-500 mt-1">سيظهر المطلوب منك هنا فور تسجيل المعلم لأول تسميع</p>
           </div>
         )}
@@ -2581,10 +2624,10 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
         </div>
 
         <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">الأخطاء ({student.errorsLog.length})</h4>
-          {student.errorsLog.length===0 ? <p className="text-xs text-emerald-700 text-center py-2 bg-emerald-50 border border-emerald-200 rounded-xl">لا يوجد أخطاء مسجلة، ما شاء الله!</p> : (
+          <h4 className="font-bold text-xs mb-3">الأخطاء ({studentLive.errorsLog.length})</h4>
+          {studentLive.errorsLog.length===0 ? <p className="text-xs text-emerald-700 text-center py-2 bg-emerald-50 border border-emerald-200 rounded-xl">لا يوجد أخطاء مسجلة، ما شاء الله!</p> : (
             <div className="space-y-2">
-              {student.errorsLog.map(e=> (
+              {studentLive.errorsLog.map(e=> (
                 <div key={e.id} className="p-3 rounded-xl border bg-red-50/40 border-red-200">
                   <p className="font-bold text-xs text-red-800">{e.type} — <span className="font-normal text-gray-700">{e.description}</span></p>
                   <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
@@ -2594,10 +2637,10 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           )}
         </div>
         <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">الملاحظات ({student.notes.length})</h4>
-          {student.notes.length===0 ? <p className="text-xs text-gray-400 text-center py-2">لا توجد ملاحظات</p> : (
+          <h4 className="font-bold text-xs mb-3">الملاحظات ({studentLive.notes.length})</h4>
+          {studentLive.notes.length===0 ? <p className="text-xs text-gray-400 text-center py-2">لا توجد ملاحظات</p> : (
             <div className="space-y-2">
-              {student.notes.map(n=> (
+              {studentLive.notes.map(n=> (
                 <div key={n.id} className="p-3 rounded-xl border bg-[#FAF9F4] border-[#E1E5DA]">
                   <p className="text-xs leading-5">{n.text}</p>
                   <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(n.date)} • {staff.find(s=>s.id===n.authorId)?.name || "—"}</p>
@@ -2807,8 +2850,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 }) {
   const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
   const link = linkForStudent(student)
-  const shortLink = `${window.location.origin + window.location.pathname.split("?")[0].split("#")[0]}?t=${student.accessToken}`
-  const waText = `السلام عليكم ورحمة الله وبركاته\n\nهذا رابط متابعة الطالب ${student.name} في حلقته.\n\nيمكنك الاحتفاظ بالرابط والرجوع إليه في أي وقت لمتابعة مستوى الطالب، مع التأكد من تحديث الصفحة عند الدخول لعرض آخر التحديثات.\n\n${shortLink}`
+  const shortLink = link
+  const waText = `السلام عليكم ورحمة الله وبركاته\n\nهذا رابط متابعة الطالب ${student.name} في حلقته — رابط دائم يتحدّث تلقائياً.\n\nبمجرد أن يسجّل المعلم حفظاً أو مراجعة جديدة، ستظهر مباشرة في هذا الرابط بدون حاجة لإرسال رابط جديد، ويبقى نفس الرابط صالحاً لشهور.\n\nافتح الرابط في أي وقت وسيعرض آخر تحديث لحظياً — إذا لم تظهر التحديثات اسحب للأسفل لتحديث الصفحة.\n\n${shortLink}`
   const waDigits = toWhatsAppDigits(student.phone || "")
   const isValidWa = !!waDigits && waDigits.length === 12 && /^9665\d{8}$/.test(waDigits)
   const waLink = isValidWa ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
