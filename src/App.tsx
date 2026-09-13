@@ -758,9 +758,55 @@ export default function App() {
         }
         // أيضاً اجلب circles و staff و attendance للعرض الكامل إن لم تكن موجودة
         // جلب اسم الحلقة وبيانات الخطة إن لزم
+        // --- جلب الخطة السنوية والحلقات للعرض الكامل لولي الأمر ---
+        sb.from("halqati_settings").select("data").eq("id", "academic_plan").maybeSingle().then(({ data: planData }) => {
+          if (planData?.data && planData.data.startDate && planData.data.endDate) {
+            setPlan(planData.data as AcademicPlan)
+            try { localStorage.setItem("halqati_academic_plan", JSON.stringify(planData.data)) } catch {}
+          }
+        })
+        sb.from("halqati_circles").select("*").then(({ data: circlesData }) => {
+          if (circlesData && circlesData.length) {
+            const newCircles: Circle[] = circlesData.map((x: any) => ({ id: x.id, name: x.name }))
+            setCircles(newCircles)
+            try { localStorage.setItem("halqati_circles", JSON.stringify(newCircles)) } catch {}
+          }
+        })
+        sb.from("halqati_staff").select("*").then(({ data: staffData }) => {
+          if (staffData && staffData.length) {
+            const newStaff: Staff[] = staffData.map((x: any) => ({ id: x.id, name: x.name, phone: x.phone, role: x.role, circleId: x.circle_id }))
+            setStaff(newStaff)
+          }
+        })
       }
     })
   }, [students])
+
+  // === جلب الخطة السنوية لصفحة ولي الأمر حتى لو كان الطالب موجوداً في الرابط المباشر (d) أو محلياً ===
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get("t")
+    if (!token) return
+    const sb = getSupabase()
+    if (!sb) return
+    // حتى لو وجد الطالب محلياً، نحتاج الخطة الكاملة من السحابة لعرض كل الأسابيع
+    sb.from("halqati_settings").select("data").eq("id", "academic_plan").maybeSingle().then(({ data: planData }) => {
+      if (planData?.data && planData.data.startDate && planData.data.endDate) {
+        // لا تستبدل إذا كانت الخطة المحلية تبدو مخصصة (ليست اليوم فقط)، لكن لولي الأمر نعطي أولوية للسحابة
+        setPlan(planData.data as AcademicPlan)
+        try { localStorage.setItem("halqati_academic_plan", JSON.stringify(planData.data)) } catch {}
+      }
+    })
+    // وكذلك الحلقات للعرض الصحيح لاسم الحلقة
+    if (circles.length === 0) {
+      sb.from("halqati_circles").select("*").then(({ data: circlesData }) => {
+        if (circlesData && circlesData.length) {
+          const newCircles: Circle[] = circlesData.map((x: any) => ({ id: x.id, name: x.name }))
+          setCircles(newCircles)
+        }
+      })
+    }
+  }, [])
 
   // Persist
   useEffect(() => { localStorage.setItem("halqati_circles", JSON.stringify(circles)) }, [circles])
