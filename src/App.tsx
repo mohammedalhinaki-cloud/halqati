@@ -2755,7 +2755,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
   const link = linkForStudent(student)
   const shortLink = `${window.location.origin + window.location.pathname.split("?")[0].split("#")[0]}?t=${student.accessToken}`
-  const waText = `السلام عليكم ورحمة الله،\nرابط متابعة الطالب ${student.name} (${circleName}) في حلقتي:\n${shortLink}`
+  const waText = `السلام عليكم ورحمة الله وبركاته\n\nهذا رابط متابعة الطالب ${student.name} في حلقته.\n\nيمكنك الاحتفاظ بالرابط والرجوع إليه في أي وقت لمتابعة مستوى الطالب، مع التأكد من تحديث الصفحة عند الدخول لعرض آخر التحديثات.\n\n${shortLink}`
   const waDigits = toWhatsAppDigits(student.phone || "")
   const isValidWa = !!waDigits && waDigits.length === 12 && /^9665\d{8}$/.test(waDigits)
   const waLink = isValidWa ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
