@@ -1947,6 +1947,8 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   }, [student])
 
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
+  const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
+  const [newGrade, setNewGrade] = React.useState<Grade>("ممتاز")
   const [showPlanPage, setShowPlanPage] = React.useState(false)
 
   // السجلات السابقة = كل السجلات ما عدا الأحدث لكل نوع
@@ -2240,6 +2242,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
   // ===== المطلوب غداً — آخر تسجيل لكل نوع =====
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
+  const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
+  const [newGrade, setNewGrade] = React.useState<Grade>("ممتاز")
   const latestMem = React.useMemo(() => {
     if (!student.memorizationLog.length) return null
     return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as MemorizationEntry
@@ -2342,7 +2346,12 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestMem.grade]}}>{latestMem.grade}</span>
                       <span className="text-[11px] text-gray-500">{fmtBoth(latestMem.date)}</span>
                     </div>
-                    {!readOnly && <button onClick={() => { if (confirm("حذف هذا الحفظ؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== latestMem.id) }) }} className="mt-2 text-[11px] px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold w-full">حذف</button>}
+                    {!readOnly && (
+                      <div className="flex gap-1.5 mt-2">
+                        <button onClick={() => { setEditingGrade({ id: latestMem.id, type: "mem", current: latestMem.grade }); setNewGrade(latestMem.grade); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل التقدير</button>
+                        <button onClick={() => { if (confirm("حذف هذا الحفظ؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== latestMem.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -2368,7 +2377,12 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestSmall.grade]}}>{latestSmall.grade}</span>
                       <span className="text-[11px] text-gray-500">{fmtBoth(latestSmall.date)}</span>
                     </div>
-                    {!readOnly && <button onClick={() => { if (confirm("حذف هذه المراجعة الصغرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestSmall.id) }) }} className="mt-2 text-[11px] px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold w-full">حذف</button>}
+                    {!readOnly && (
+                      <div className="flex gap-1.5 mt-2">
+                        <button onClick={() => { setEditingGrade({ id: latestSmall.id, type: "small", current: latestSmall.grade }); setNewGrade(latestSmall.grade); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل التقدير</button>
+                        <button onClick={() => { if (confirm("حذف هذه المراجعة الصغرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestSmall.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -2394,7 +2408,12 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestLarge.grade]}}>{latestLarge.grade}</span>
                       <span className="text-[11px] text-gray-500">{fmtBoth(latestLarge.date)}</span>
                     </div>
-                    {!readOnly && <button onClick={() => { if (confirm("حذف هذه المراجعة الكبرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestLarge.id) }) }} className="mt-2 text-[11px] px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold w-full">حذف</button>}
+                    {!readOnly && (
+                      <div className="flex gap-1.5 mt-2">
+                        <button onClick={() => { setEditingGrade({ id: latestLarge.id, type: "large", current: latestLarge.grade }); setNewGrade(latestLarge.grade); }} className="flex-1 text-[11px] px-2 py-1.5 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل التقدير</button>
+                        <button onClick={() => { if (confirm("حذف هذه المراجعة الكبرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestLarge.id) }) }} className="flex-1 text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold">حذف</button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -2454,6 +2473,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                          {!readOnly && <button onClick={() => { setEditingGrade({ id: e.id, type: "mem", current: e.grade }); setNewGrade(e.grade); }} className="text-[11px] px-2 py-1 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>}
                           {!readOnly && <button onClick={() => { if (confirm("حذف التسجيل؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== e.id) }) }} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
                         </div>
                       </div>
@@ -2473,6 +2493,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                          {!readOnly && <button onClick={() => { const rt = (e as ReviewEntry).reviewType; setEditingGrade({ id: e.id, type: rt as any, current: e.grade }); setNewGrade(e.grade); }} className="text-[11px] px-2 py-1 rounded-full bg-white border border-[#1F5E3A] text-[#1F5E3A] font-bold">تعديل</button>}
                           {!readOnly && <button onClick={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
                         </div>
                       </div>
@@ -2534,6 +2555,39 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
         </div>
 
 
+
+        {/* Modal تعديل التقدير — يسمح للمعلم بالرجوع وتقييم أي تسجيل سابق بدون تقدير */}
+        {editingGrade && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setEditingGrade(null)} />
+            <div className="relative bg-white w-full max-w-sm rounded-2xl shadow-xl border p-5">
+              <h3 className="font-black text-sm mb-3" style={{color:"#163F27"}}>تعديل التقدير</h3>
+              <p className="text-xs text-gray-500 mb-3">اختر التقدير الجديد — يمكنك التعديل حتى بعد الحفظ بدون تقدير</p>
+              <div className="mb-3 p-2 bg-[#FAF9F4] rounded-xl border text-xs">
+                <span className="text-gray-500">الحالي:</span> <span className="font-bold px-2 py-0.5 rounded-full text-white text-[11px]" style={{background: GRADE_COLOR[editingGrade.current]}}>{editingGrade.current}</span>
+                <span className="text-gray-400 mx-1">→</span>
+                <span className="font-bold px-2 py-0.5 rounded-full text-white text-[11px]" style={{background: GRADE_COLOR[newGrade]}}>{newGrade}</span>
+              </div>
+              <select value={newGrade} onChange={e => setNewGrade(e.target.value as Grade)} className="w-full px-3 py-2.5 rounded-xl border bg-white text-sm">
+                {GRADES.map(g => <option key={g} value={g}>{g === "بدون تقدير" ? "بدون تقدير — بانتظار التسميع" : g}</option>)}
+              </select>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => {
+                  if (!editingGrade) return
+                  if (editingGrade.type === "mem") {
+                    const updated = { ...student, memorizationLog: student.memorizationLog.map(x => x.id === editingGrade.id ? { ...x, grade: newGrade } : x) }
+                    onUpdate(updated)
+                  } else {
+                    const updated = { ...student, reviewLog: student.reviewLog.map(x => x.id === editingGrade.id ? { ...x, grade: newGrade } : x) }
+                    onUpdate(updated)
+                  }
+                  setEditingGrade(null)
+                }} className="flex-1 py-2.5 rounded-xl bg-[#1F5E3A] text-white font-bold text-sm">حفظ التقدير</button>
+                <button onClick={() => setEditingGrade(null)} className="flex-1 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">إلغاء</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="pb-6" />
       </div>
