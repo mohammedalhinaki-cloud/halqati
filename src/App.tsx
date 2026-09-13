@@ -143,9 +143,11 @@ DROP POLICY IF EXISTS "Public access halqati_attendance" ON halqati_attendance;
 CREATE POLICY "Public access halqati_attendance" ON halqati_attendance FOR ALL USING (true) WITH CHECK (true);
 SELECT 'تم إنشاء جداول نظام حلقتي بنجاح!' AS status;`
 
+const FALLBACK_SUPABASE_URL = "https://fwkksiilsdmxlwxdozku.supabase.co"
+const FALLBACK_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3a2tzaWlsc2RteGx3eGRvemt1Iiwicm9sIjoiYW5vbiIsImlhdCI6MTc4OTE0OTU3MywiZXhwIjoyMTA0NzI1NTczMH0.EOewtAxaKIMBT4JNLupfPR0MoFOobWGB3yDcPyJIJ8k"
 function getSupabaseConfig() {
-  const url = (import.meta as any).env?.VITE_SUPABASE_URL || localStorage.getItem("halqati_supabase_url") || ""
-  const anonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || localStorage.getItem("halqati_supabase_anon_key") || ""
+  const url = (import.meta as any).env?.VITE_SUPABASE_URL || localStorage.getItem("halqati_supabase_url") || FALLBACK_SUPABASE_URL
+  const anonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || localStorage.getItem("halqati_supabase_anon_key") || FALLBACK_SUPABASE_ANON_KEY
   return { url, anonKey, isConfigured: !!(url && anonKey) }
 }
 let supabaseClient: SupabaseClient | null = null
@@ -186,9 +188,28 @@ const fmtBoth = (iso: string) => {
   } catch { return iso }
 }
 const tokenForStudent = (s: Student) => s.accessToken
+// ترميز بيانات الطالب للرابط المباشر (بدون حاجة Supabase) — يدعم العربية
+const encodeStudentForLink = (s: Student): string => {
+  try {
+    const json = JSON.stringify(s)
+    return btoa(unescape(encodeURIComponent(json)))
+  } catch { return "" }
+}
+const decodeStudentFromLink = (b64: string): Student | null => {
+  try {
+    const json = decodeURIComponent(escape(atob(b64)))
+    return JSON.parse(json) as Student
+  } catch { return null }
+}
 const linkForStudent = (s: Student) => {
   const base = window.location.origin + window.location.pathname.split("?")[0].split("#")[0]
-  return `${base}?t=${s.accessToken}`
+  const token = s.accessToken
+  const data = encodeStudentForLink(s)
+  // رابط هجين: t للتوافق + d للعرض بدون سحابة (إذا كان طويلاً جداً نرسل t فقط ويعتمد على السحابة)
+  const urlWithData = `${base}?t=${token}&d=${encodeURIComponent(data)}`
+  // إذا كان الرابط أطول من 1800 حرف، نرسل t فقط لتجنب قطع واتساب
+  if (urlWithData.length > 1800) return `${base}?t=${token}`
+  return urlWithData
 }
 // helper: هل زار الطالب رابط المتابعة اليوم؟ (يتجدد كل يوم — بدون عدّ تراكمي)
 const hasVisitedToday = (s: Student) => {
@@ -512,11 +533,30 @@ export default function App() {
     }
   }, [])
 
-  // ====== جلب بيانات الطالب لولي الأمر من Supabase إذا لم يوجد محلياً (إصلاح رابط واتساب منتهي) ======
+  // ====== جلب بيانات الطالب لولي الأمر من Supabase إذا لم يوجد محلياً (إصلاح رابط واتساب منتهي) + دعم الرابط المباشر بدون سحابة ======
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const t = params.get("t")
+    const d = params.get("d")
     if (!t) return
+    // إذا كان الرابط يحمل بيانات مباشرة، استخدمها فوراً بدون انتظار Supabase
+    if (d) {
+      try {
+        const decoded = decodeStudentFromLink(decodeURIComponent(d))
+        if (decoded && decoded.accessToken === t) {
+          setParentCloudStudent(decoded)
+          // سجل زيارة يومية محلياً
+          const today = todayISO()
+          const alreadyVisited = (decoded.visitLog || []).some((v: any) => v.date === today)
+          if (!alreadyVisited) {
+            const newVisits = [...(decoded.visitLog || []), { date: today, count: 1 }]
+            const updated = { ...decoded, visitLog: newVisits }
+            setParentCloudStudent(updated)
+          }
+          return
+        }
+      } catch {}
+    }
     // إذا وجد محلياً لا حاجة للجلب
     const localFound = students.find(x => x.accessToken === t)
     if (localFound) return
@@ -935,7 +975,12 @@ export default function App() {
   {
     const _gParams = new URLSearchParams(window.location.search)
     const _gToken = _gParams.get("t")
+    const _gData = _gParams.get("d")
     let _gStudent: Student | null = parentCloudStudent
+    // أولاً حاول فك البيانات من الرابط (يعمل بدون Supabase)
+    if (!_gStudent && _gData) {
+      try { const _decoded = decodeStudentFromLink(decodeURIComponent(_gData)); if (_decoded && _decoded.accessToken === _gToken) _gStudent = _decoded; } catch {}
+    }
     if (!_gStudent && _gToken) {
       _gStudent = students.find(x => x.accessToken === _gToken) || null
       if (!_gStudent) {
@@ -993,7 +1038,11 @@ export default function App() {
     // === مسار ولي الأمر عبر ?t= — عرض مباشر بدون تسجيل (مع جلب سحابي) ===
     const _parentParams = new URLSearchParams(window.location.search)
     const _parentToken = _parentParams.get("t")
+    const _parentData = _parentParams.get("d")
     let _parentStudent: Student | null = parentCloudStudent
+    if (!_parentStudent && _parentData) {
+      try { const _dec = decodeStudentFromLink(decodeURIComponent(_parentData)); if (_dec && _dec.accessToken === _parentToken) _parentStudent = _dec; } catch {}
+    }
     if (!_parentStudent && _parentToken) {
       _parentStudent = students.find(x => x.accessToken === _parentToken) || null
       if (!_parentStudent) {
