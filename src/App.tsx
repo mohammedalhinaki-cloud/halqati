@@ -2754,7 +2754,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 }) {
   const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
   const link = linkForStudent(student)
-  const waText = `السلام عليكم ورحمة الله،\nرابط متابعة الطالب ${student.name} (${circleName}) في حلقتي:\n${link}`
+  const shortLink = `${window.location.origin + window.location.pathname.split("?")[0].split("#")[0]}?t=${student.accessToken}`
+  const waText = `السلام عليكم ورحمة الله،\nرابط متابعة الطالب ${student.name} (${circleName}) في حلقتي:\n${shortLink}`
   const waDigits = toWhatsAppDigits(student.phone || "")
   const isValidWa = !!waDigits && waDigits.length === 12 && /^9665\d{8}$/.test(waDigits)
   const waLink = isValidWa ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
@@ -2820,15 +2821,10 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
         <div className="bg-white rounded-2xl border p-4">
           <p className="font-bold text-xs mb-2">رابط المتابعة لولي الأمر</p>
           <div className="flex gap-2">
-            <input value={link} readOnly dir="ltr" className="flex-1 px-3 py-2 rounded-xl border bg-gray-50 text-xs ltr" />
-            <button onClick={copyLink} className="px-3 py-2 rounded-xl bg-[#1F5E3A] text-white text-xs font-bold">نسخ</button>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <a href={isValidWa ? waLink : waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 rounded-xl bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-bold">📱 واتساب لولي الأمر</a>
-            <a href={waGeneral} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl bg-white border text-xs font-bold">مشاركة عامة</a>
+            <a href={isValidWa ? waLink : waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-bold">واتساب لولي الأمر</a>
+            <a href={waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">مشاركة عامة</a>
           </div>
           {!isValidWa && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2 leading-5">⚠️ رقم جوال ولي الأمر غير صحيح أو غير مدخل — سيُفتح واتساب للمشاركة العامة. أدخل رقم 05XXXXXXXX في تعديل الطالب ليُرسل مباشرة لولي الأمر.</p>}
-          {isValidWa && <p className="text-[10px] text-gray-400 mt-2">سيُرسل إلى: ‎+{waDigits} — الرابط يعمل على أي جهاز بعد رفع البيانات للسحابة</p>}
           {(() => { const _visitedToday = (student.visitLog || []).some(v => v.date === todayISO()); return (<div className="mt-3 flex flex-col gap-1"><span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border w-fit ${ _visitedToday ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}><span className={`w-1.5 h-1.5 rounded-full ${ _visitedToday ? "bg-emerald-500" : "bg-amber-500"}`}></span>{_visitedToday ? "✓ زار رابط المتابعة اليوم" : "○ لم يزر رابط المتابعة اليوم"}</span><span className="text-[10px] text-gray-400">يتجدد تلقائياً كل يوم — يظهر "زار" فقط إذا دخل ولي الأمر رابط المتابعة خلال اليوم الحالي</span></div>)})()}
         </div>
 
