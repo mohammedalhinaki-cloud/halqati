@@ -195,6 +195,156 @@ const hasVisitedToday = (s: Student) => {
   return (s.visitLog || []).some(v => v.date === today)
 }
 
+// ===================== Weekly Calendar Helpers — تقويم أسبوعي للخطة السنوية =====================
+const addDaysISO = (iso: string, days: number) => {
+  const d = new Date(iso + "T12:00:00")
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+const getWeekday = (iso: string) => new Date(iso + "T12:00:00").getDay() // 0 الأحد
+const isDateInHoliday = (iso: string, holidays: Holiday[]) => holidays.find(h => iso >= h.startDate && iso <= h.endDate) || null
+const formatGregShort = (iso: string) => {
+  try {
+    const d = new Date(iso + "T12:00:00")
+    return d.toLocaleDateString("ar-EG", { day: 'numeric', month: 'numeric' })
+  } catch { return iso.slice(5).replace("-", "/") }
+}
+const formatHijriShort = (iso: string) => {
+  try {
+    return new Date(iso + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-islamic-umalqura", { day: 'numeric', month: 'short' })
+  } catch { return "" }
+}
+type DayType = "recitation" | "regularHoliday" | "officialHoliday"
+function getDayType(iso: string, plan: AcademicPlan): { type: DayType, holiday: Holiday | null } {
+  const h = isDateInHoliday(iso, plan.holidays)
+  if (h) return { type: "officialHoliday", holiday: h }
+  const wd = getWeekday(iso)
+  if (!plan.activeWeekdays.includes(wd)) return { type: "regularHoliday", holiday: null }
+  return { type: "recitation", holiday: null }
+}
+interface WeekInfo { weekNumber: number; start: string; end: string; days: (string | null)[] }
+function generateWeeks(plan: AcademicPlan): WeekInfo[] {
+  if (!plan.startDate || !plan.endDate || plan.startDate > plan.endDate) return []
+  const start = plan.startDate
+  const end = plan.endDate
+  const startWeekDay = getWeekday(start)
+  let weekStart = addDaysISO(start, -startWeekDay)
+  const weeks: WeekInfo[] = []
+  let weekNumber = 1
+  while (weekStart <= end) {
+    const weekEnd = addDaysISO(weekStart, 6)
+    const actualStart = weekStart < start ? start : weekStart
+    const actualEnd = weekEnd > end ? end : weekEnd
+    if (actualStart <= actualEnd) {
+      const days: (string | null)[] = []
+      for (let i = 0; i < 7; i++) {
+        const cur = addDaysISO(weekStart, i)
+        if (cur < start || cur > end) days.push(null)
+        else days.push(cur)
+      }
+      weeks.push({ weekNumber, start: actualStart, end: actualEnd, days })
+      weekNumber++
+    }
+    weekStart = addDaysISO(weekStart, 7)
+    if (weeks.length > 80) break
+  }
+  return weeks
+}
+function WeeklyCalendar({ plan }: { plan: AcademicPlan }) {
+  const today = todayISO()
+  const weeks = useMemo(() => generateWeeks(plan), [plan])
+  const summary = useMemo(() => {
+    if (!weeks.length) return { totalWeeks: 0, recitation: 0, regular: 0, official: 0 }
+    let rec = 0, reg = 0, off = 0
+    for (const w of weeks) for (const d of w.days) if (d) {
+      const { type } = getDayType(d, plan)
+      if (type === "recitation") rec++
+      else if (type === "regularHoliday") reg++
+      else if (type === "officialHoliday") off++
+    }
+    return { totalWeeks: weeks.length, recitation: rec, regular: reg, official: off }
+  }, [weeks, plan])
+  if (!plan.startDate || !plan.endDate) {
+    return <div className="text-center py-8 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">يرجى تحديد تاريخ بداية ونهاية الخطة لعرض التقويم الأسبوعي</div>
+  }
+  if (plan.startDate > plan.endDate) {
+    return <div className="text-center py-8 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">تاريخ البداية بعد تاريخ النهاية — يرجى تصحيح التواريخ</div>
+  }
+  if (!weeks.length) {
+    return <div className="text-center py-8 text-xs text-gray-400">لا توجد أسابيع ضمن الفترة المحددة</div>
+  }
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border p-4 shadow-sm">
+        <h4 className="font-black text-xs mb-3" style={{ color: "#163F27" }}>وسيلة الإيضاح</h4>
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border bg-[#1F5E3A] text-white border-[#1F5E3A]"><span className="w-3 h-3 rounded bg-white/30 border border-white/50"></span> يوم التسميع</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border bg-[#E8F5E9] text-[#1B5E20] border-[#A5D6A7]"><span className="w-3 h-3 rounded bg-[#A5D6A7] border border-[#81C784]"></span> إجازة عادية</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border bg-[#E3F2FD] text-[#0D47A1] border-[#90CAF9]"><span className="w-3 h-3 rounded bg-[#90CAF9] border border-[#64B5F6]"></span> إجازة رسمية</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border bg-gray-100 text-gray-500 border-gray-300 opacity-60"><span className="w-3 h-3 rounded bg-gray-300 border"></span> يوم انتهى (باهت)</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold border bg-white text-[#1F5E3A] border-[#1F5E3A] ring-2 ring-[#1F5E3A]/30"><span className="w-3 h-3 rounded bg-[#1F5E3A]"></span> اليوم الحالي</span>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-2">الألوان تحافظ على حالة اليوم الأصلية حتى بعد انتهائه — فقط يصبح باهتاً بصرياً</p>
+      </div>
+      <div className="space-y-3">
+        {weeks.map(w => (
+          <div key={w.weekNumber} className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-[#FAF9F4]/80 border-b flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-black text-sm flex items-center gap-2" style={{ color: "#163F27" }}><span className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white" style={{ background: "#1F5E3A" }}>{w.weekNumber}</span> الأسبوع {w.weekNumber === 1 ? "الأول" : w.weekNumber === 2 ? "الثاني" : w.weekNumber === 3 ? "الثالث" : `رقم ${w.weekNumber}`}</h3>
+              <span className="text-[11px] font-bold text-gray-600 bg-white border px-2.5 py-1 rounded-full">{fmtBoth(w.start)} — {fmtBoth(w.end)}</span>
+            </div>
+            <div className="p-2 md:p-3">
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {WEEKDAYS.map((d, i) => <div key={i} className="text-center text-[10px] font-black text-gray-500 py-1">{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1 md:gap-1.5">
+                {w.days.map((iso, idx) => {
+                  if (!iso) {
+                    return <div key={idx} className="min-h-[72px] md:min-h-[84px] rounded-xl border border-dashed border-gray-200 bg-gray-50/50"></div>
+                  }
+                  const { type, holiday } = getDayType(iso, plan)
+                  const isPast = iso < today
+                  const isToday = iso === today
+                  let base = ""
+                  if (type === "recitation") base = "bg-[#1F5E3A] text-white border-[#1F5E3A]"
+                  else if (type === "regularHoliday") base = "bg-[#E8F5E9] text-[#1B5E20] border-[#C8E6C9]"
+                  else if (type === "officialHoliday") base = "bg-[#E3F2FD] text-[#0D47A1] border-[#90CAF9]"
+                  const faded = isPast ? " opacity-60 grayscale-[0.15] " : ""
+                  const todayRing = isToday ? " ring-2 ring-[#1F5E3A] ring-offset-1 z-10 shadow-md " : ""
+                  const weekday = getWeekday(iso)
+                  return (
+                    <div key={iso} className={`relative min-h-[72px] md:min-h-[84px] rounded-xl border p-1.5 flex flex-col items-center justify-center text-center transition ${base} ${faded} ${todayRing}`}>
+                      {isToday && <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#C9A227] rounded-full border-2 border-white shadow"></span>}
+                      <span className="text-[10px] font-black leading-none">{WEEKDAYS[weekday]}</span>
+                      <span className="text-[11px] font-black mt-0.5 leading-none" dir="ltr">{formatGregShort(iso)}</span>
+                      <span className="text-[9px] font-bold opacity-80 leading-none mt-0.5">{formatHijriShort(iso)}</span>
+                      {holiday && <span className="text-[8px] font-bold mt-1 px-1 py-0.5 rounded bg-white/90 text-[#0D47A1] border leading-none max-w-full truncate">{holiday.name}</span>}
+                      {isPast && !isToday && <span className="absolute bottom-1 text-[7px] font-bold opacity-60">انتهى</span>}
+                      {isToday && <span className="absolute bottom-1 text-[7px] font-bold bg-[#C9A227] text-white px-1 rounded-full">اليوم</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-2xl border p-4 shadow-sm">
+        <h4 className="font-black text-sm mb-3 flex items-center gap-2" style={{ color: "#163F27" }}><span className="w-1 h-4 rounded-full" style={{ background: "#1F5E3A" }}></span> ملخص الخطة</h4>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="bg-[#FAF9F4] rounded-xl p-3 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الأسابيع</p><p className="font-black text-lg" style={{ color: "#163F27" }}>{summary.totalWeeks}</p></div>
+          <div className="bg-[#FAF9F4] rounded-xl p-3 border text-center"><p className="text-[11px] font-bold text-gray-500">بداية الخطة</p><p className="font-bold text-xs mt-1" style={{ color: "#163F27" }}>{fmtBoth(plan.startDate)}</p></div>
+          <div className="bg-[#FAF9F4] rounded-xl p-3 border text-center"><p className="text-[11px] font-bold text-gray-500">نهاية الخطة</p><p className="font-bold text-xs mt-1" style={{ color: "#163F27" }}>{fmtBoth(plan.endDate)}</p></div>
+          <div className="bg-[#1F5E3A] rounded-xl p-3 border border-[#163F27] text-center text-white"><p className="text-[11px] font-bold opacity-80">أيام التسميع</p><p className="font-black text-lg">{summary.recitation}</p><p className="text-[9px] opacity-70">يوم</p></div>
+          <div className="bg-[#E8F5E9] rounded-xl p-3 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجازة عادية</p><p className="font-black text-lg" style={{ color: "#1B5E20" }}>{summary.regular}</p><p className="text-[9px] text-[#2E7D32]">يوم</p></div>
+          <div className="bg-[#E3F2FD] rounded-xl p-3 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجازة رسمية</p><p className="font-black text-lg" style={{ color: "#0D47A1" }}>{summary.official}</p><p className="text-[9px] text-[#1565C0]">يوم</p></div>
+        </div>
+        <p className="text-[10px] text-gray-400 text-center mt-3">تقويم أسبوعي محسوب تلقائياً — لا حاجة لإدخال الأسابيع يدوياً</p>
+      </div>
+    </div>
+  )
+}
+
 // ===================== App =====================
 export default function App() {
   // Data
@@ -979,61 +1129,11 @@ export default function App() {
             </button>
             <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
               <div className="px-6 py-5 border-b bg-[#FAF9F4]/60">
-                <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📅 الخطة السنوية</h2>
-                <p className="text-xs text-gray-500 mt-1">تفاصيل السنة الدراسية وأيام التسميع والإجازات المعتمدة — عرض فقط</p>
+                <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📅 الخطة السنوية — تقويم أسبوعي</h2>
+                <p className="text-xs text-gray-500 mt-1">تقويم أسبوعي للسنة الدراسية — أيام التسميع والإجازات — عرض فقط</p>
               </div>
-              <div className="p-6 space-y-6">
-                <div>
-                  <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> السنة الدراسية</h3>
-                  <div className="grid md:grid-cols-2 gap-3 mt-3">
-                    <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
-                      <p className="text-[11px] font-bold text-gray-500">تاريخ البداية</p>
-                      <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.startDate ? fmtBoth(plan.startDate) : "غير محدد"}</p>
-                    </div>
-                    <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
-                      <p className="text-[11px] font-bold text-gray-500">تاريخ النهاية</p>
-                      <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.endDate ? fmtBoth(plan.endDate) : "غير محدد"}</p>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> أيام التسميع الأسبوعية</h3>
-                  <p className="text-[11px] text-gray-500 mt-1">الأيام المفعّلة هي أيام الحضور والتسميع المعتمدة</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-                    {WEEKDAYS.map((d, i) => (
-                      <div key={i} className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition ${plan.activeWeekdays.includes(i) ? "bg-[#1F5E3A] text-white border-[#1F5E3A] shadow-sm" : "bg-white text-gray-400 border-[#E1E5DA]"}`}>
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-center mt-3 px-3 py-2 rounded-xl bg-[#E7EFE7] border border-[#1F5E3A]/20 font-bold" style={{color:"#1F5E3A"}}>
-                    الجدول الأسبوعي: {plan.activeWeekdays.length ? plan.activeWeekdays.map(i=> WEEKDAYS[i]).join("، ") : "لم يتم تحديد أيام"}
-                  </p>
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> الإجازات والمناسبات <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#E7EFE7] border border-[#1F5E3A]/20 text-[#1F5E3A]">{plan.holidays.length}</span></h3>
-                  {plan.holidays.length===0 ? (
-                    <div className="text-center py-8 bg-[#FAF9F4] rounded-xl border border-dashed mt-3">
-                      <p className="text-2xl mb-1">🏖️</p>
-                      <p className="text-xs font-bold text-gray-600">لا توجد إجازات مسجلة حالياً</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 mt-3">
-                      {plan.holidays.map(h=> (
-                        <div key={h.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4] border-[#E1E5DA]">
-                          <div>
-                            <p className="font-bold text-xs" style={{color:"#163F27"}}>{h.name}</p>
-                            <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(h.startDate)} إلى {fmtBoth(h.endDate)}</p>
-                          </div>
-                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white border text-gray-600">إجازة</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="bg-[#FAF9F4] border border-[#E1E5DA] rounded-xl p-3 text-center">
-                  <p className="text-[11px] text-gray-500">💡 هذه الخطة معتمدة من إدارة الحلقة وتُحدّث تلقائياً — للعرض فقط</p>
-                </div>
+              <div className="p-4 md:p-6">
+                <WeeklyCalendar plan={plan} />
               </div>
             </div>
             <button onClick={()=> setShowTeacherPlan(false)} className="w-full py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm transition">العودة للوحة التحكم</button>
@@ -1636,9 +1736,9 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-[640px] rounded-2xl shadow-xl border max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="relative bg-white w-full max-w-[920px] rounded-2xl shadow-xl border max-h-[90vh] flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b bg-[#FAF9F4] flex items-center justify-between">
-          <h3 className="font-black text-sm" style={{ color: "#163F27" }}>الخطة السنوية للحلقة</h3>
+          <h3 className="font-black text-sm" style={{ color: "#163F27" }}>الخطة السنوية للحلقة — تقويم أسبوعي</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-white border">✕</button>
         </div>
         <div className="p-6 overflow-auto flex-1 space-y-5">
@@ -1686,6 +1786,11 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
                   </div>
                 ))}
             </div>
+          </div>
+          <div className="border-t pt-5">
+            <h4 className="font-black text-sm mb-1 flex items-center gap-2" style={{ color: "#163F27" }}>📅 معاينة التقويم الأسبوعي</h4>
+            <p className="text-[11px] text-gray-500 mb-3">معاينة حية تُحسب تلقائياً من التواريخ وأيام التسميع والإجازات — أي تغيير يظهر فوراً دون حفظ إضافي</p>
+            <WeeklyCalendar plan={plan} />
           </div>
         </div>
         <div className="px-6 py-3 bg-gray-50 border-t flex justify-between items-center">
@@ -1758,69 +1863,12 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
           <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
             <div className="px-6 py-5 border-b bg-[#FAF9F4]/60">
-              <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📅 الخطة السنوية</h2>
-              <p className="text-xs text-gray-500 mt-1">تفاصيل السنة الدراسية وأيام التسميع والإجازات المعتمدة</p>
+              <h2 className="font-black text-lg flex items-center gap-2" style={{color:"#163F27"}}>📅 الخطة السنوية — تقويم أسبوعي</h2>
+              <p className="text-xs text-gray-500 mt-1">تقويم أسبوعي للسنة الدراسية — أيام التسميع والإجازات المعتمدة — محسوب تلقائياً</p>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* السنة الدراسية */}
-              <div>
-                <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> السنة الدراسية</h3>
-                <div className="grid md:grid-cols-2 gap-3 mt-3">
-                  <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
-                    <p className="text-[11px] font-bold text-gray-500">تاريخ البداية</p>
-                    <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.startDate ? fmtBoth(plan.startDate) : "غير محدد"}</p>
-                  </div>
-                  <div className="bg-[#FAF9F4] rounded-xl p-4 border border-[#E1E5DA]">
-                    <p className="text-[11px] font-bold text-gray-500">تاريخ النهاية</p>
-                    <p className="font-black text-sm mt-1" style={{color:"#163F27"}}>{plan.endDate ? fmtBoth(plan.endDate) : "غير محدد"}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* أيام التسميع */}
-              <div>
-                <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> أيام التسميع الأسبوعية</h3>
-                <p className="text-[11px] text-gray-500 mt-1">الأيام المفعّلة هي أيام الحضور والتسميع المعتمدة</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-                  {WEEKDAYS.map((d, i) => (
-                    <div key={i} className={`px-3 py-2.5 rounded-xl border text-xs font-bold text-center transition ${plan.activeWeekdays.includes(i) ? "bg-[#1F5E3A] text-white border-[#1F5E3A] shadow-sm" : "bg-white text-gray-400 border-[#E1E5DA]"}`}>
-                      {d}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-center mt-3 px-3 py-2 rounded-xl bg-[#E7EFE7] border border-[#1F5E3A]/20 font-bold" style={{color:"#1F5E3A"}}>
-                  الجدول الأسبوعي: {plan.activeWeekdays.length ? plan.activeWeekdays.map(i=> WEEKDAYS[i]).join("، ") : "لم يتم تحديد أيام"}
-                </p>
-              </div>
-
-              {/* الإجازات */}
-              <div>
-                <h3 className="font-bold text-sm flex items-center gap-2" style={{color:"#163F27"}}><span className="w-1 h-4 rounded-full" style={{background:"#1F5E3A"}}></span> الإجازات والمناسبات <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#E7EFE7] border border-[#1F5E3A]/20 text-[#1F5E3A]">{plan.holidays.length}</span></h3>
-                {plan.holidays.length===0 ? (
-                  <div className="text-center py-8 bg-[#FAF9F4] rounded-xl border border-dashed mt-3">
-                    <p className="text-2xl mb-1">🏖️</p>
-                    <p className="text-xs font-bold text-gray-600">لا توجد إجازات مسجلة حالياً</p>
-                    <p className="text-[11px] text-gray-400 mt-1">سيتم تحديثها من قبل الإدارة عند الحاجة</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 mt-3">
-                    {plan.holidays.map(h=> (
-                      <div key={h.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4] border-[#E1E5DA]">
-                        <div>
-                          <p className="font-bold text-xs" style={{color:"#163F27"}}>{h.name}</p>
-                          <p className="text-[11px] text-gray-500 mt-1">{fmtBoth(h.startDate)} إلى {fmtBoth(h.endDate)}</p>
-                        </div>
-                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white border text-gray-600">إجازة</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-[#FAF9F4] border border-[#E1E5DA] rounded-xl p-3 text-center">
-                <p className="text-[11px] text-gray-500">💡 هذه الخطة معتمدة من إدارة الحلقة وتُحدّث تلقائياً</p>
-              </div>
+            <div className="p-4 md:p-6">
+              <WeeklyCalendar plan={plan} />
             </div>
           </div>
 
