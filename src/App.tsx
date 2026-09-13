@@ -186,7 +186,7 @@ const fmtBoth = (iso: string) => {
 }
 const tokenForStudent = (s: Student) => s.accessToken
 const linkForStudent = (s: Student) => {
-  const base = window.location.origin + window.location.pathname
+  const base = window.location.origin + window.location.pathname.split("?")[0].split("#")[0]
   return `${base}?t=${s.accessToken}`
 }
 // helper: هل زار الطالب رابط المتابعة اليوم؟ (يتجدد كل يوم — بدون عدّ تراكمي)
@@ -410,6 +410,8 @@ export default function App() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
+  const [parentCloudStudent, setParentCloudStudent] = useState<Student | null>(null)
+  const [parentCloudLoading, setParentCloudLoading] = useState(false)
 
   // Add logs modals
   const [showMemModal, setShowMemModal] = useState(false)
@@ -492,6 +494,57 @@ export default function App() {
       }, 300)
     }
   }, [])
+
+  // ====== جلب بيانات الطالب لولي الأمر من Supabase إذا لم يوجد محلياً (إصلاح رابط واتساب منتهي) ======
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const t = params.get("t")
+    if (!t) return
+    // إذا وجد محلياً لا حاجة للجلب
+    const localFound = students.find(x => x.accessToken === t)
+    if (localFound) return
+    try {
+      const raw: any[] = JSON.parse(localStorage.getItem("halqati_students") || "[]")
+      if (raw.find((x: any) => x.accessToken === t)) return
+    } catch {}
+    const sb = getSupabase()
+    if (!sb) return
+    setParentCloudLoading(true)
+    sb.from("halqati_students").select("*").eq("access_token", t).maybeSingle().then(({ data, error }) => {
+      setParentCloudLoading(false)
+      if (data && !error) {
+        const s: Student = {
+          id: data.id, name: data.name, phone: data.phone || "", circleId: data.circle_id,
+          accessToken: data.access_token, memorizationLog: data.memorization_log || [], reviewLog: data.review_log || [], errorsLog: data.errors_log || [], notes: data.notes || [], visitLog: data.visit_log || []
+        }
+        setParentCloudStudent(s)
+        // خزّن محلياً للزيارات القادمة
+        try {
+          const existing: any[] = JSON.parse(localStorage.getItem("halqati_students") || "[]")
+          if (!existing.find((x: any) => x.id === s.id)) {
+            localStorage.setItem("halqati_students", JSON.stringify([...existing, s]))
+          }
+        } catch {}
+        // سجل زيارة يومية
+        const today = todayISO()
+        const alreadyVisited = (s.visitLog || []).some((v: any) => v.date === today)
+        if (!alreadyVisited) {
+          const newVisits = [...(s.visitLog || []), { date: today, count: 1 }]
+          const updated = { ...s, visitLog: newVisits }
+          setParentCloudStudent(updated)
+          // حدّث التخزين المحلي أيضاً
+          try {
+            const all: any[] = JSON.parse(localStorage.getItem("halqati_students") || "[]")
+            const idx = all.findIndex((x:any)=> x.id===s.id)
+            if (idx>=0) { all[idx].visit_log = newVisits; all[idx].visitLog = newVisits; localStorage.setItem("halqati_students", JSON.stringify(all)) }
+          } catch {}
+          sb.from("halqati_students").upsert({ id: s.id, name: s.name, phone: s.phone, circle_id: s.circleId, access_token: s.accessToken, memorization_log: s.memorizationLog, review_log: s.reviewLog, errors_log: s.errorsLog, notes: s.notes, visit_log: newVisits }, { onConflict: "id" }).then()
+        }
+        // أيضاً اجلب circles و staff و attendance للعرض الكامل إن لم تكن موجودة
+        // جلب اسم الحلقة وبيانات الخطة إن لزم
+      }
+    })
+  }, [students])
 
   // Persist
   useEffect(() => { localStorage.setItem("halqati_circles", JSON.stringify(circles)) }, [circles])
@@ -863,8 +916,8 @@ export default function App() {
   {
     const _gParams = new URLSearchParams(window.location.search)
     const _gToken = _gParams.get("t")
-    let _gStudent: Student | null = null
-    if (_gToken) {
+    let _gStudent: Student | null = parentCloudStudent
+    if (!_gStudent && _gToken) {
       _gStudent = students.find(x => x.accessToken === _gToken) || null
       if (!_gStudent) {
         try {
@@ -884,7 +937,24 @@ export default function App() {
       )
     }
     if (_gToken && !_gStudent) {
-      // حاول جلب من Supabase مرة واحدة إذا لم يوجد محلياً (اختياري سريع)
+      if (parentCloudLoading) {
+        return (
+          <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+            <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+              <div className="bg-white rounded-2xl border p-8 text-center max-w-sm shadow-sm">
+                <div className="w-10 h-10 border-4 border-[#1F5E3A]/20 border-t-[#1F5E3A] rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="font-bold text-sm" style={{color:"#163F27"}}>جاري تحميل بيانات الطالب...</p>
+                <p className="text-xs text-gray-400 mt-2">يرجى الانتظار — يتم جلب البيانات من السحابة</p>
+              </div>
+            </div>
+            <Footer />
+          </div>
+        )
+      }
+      const _hasSupabase = getSupabaseConfig().isConfigured
+      if (_hasSupabase && !parentCloudLoading) {
+        // لا يزال يحاول — اعرض تحميل قصير ثم سيظهر الخطأ إذا فشل
+      }
       return (
         <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
@@ -892,7 +962,7 @@ export default function App() {
               <p className="text-2xl mb-2">🔗</p>
               <p className="font-bold text-sm" style={{color:"#163F27"}}>رابط المتابعة غير صالح أو منتهي</p>
               <p className="text-xs text-gray-500 mt-1 leading-5">تأكد من نسخ الرابط كاملاً من المعلم أو تواصل معه للحصول على رابط جديد.</p>
-              <p className="text-[11px] text-gray-400 mt-3">هذا الرابط مخصص لولي الأمر — للاستفسار تواصل مع المعلم على واتساب</p>
+              <p className="text-[11px] text-gray-400 mt-3">إذا كان الرابط صحيحاً، تأكد أن المعلم رفع البيانات إلى السحابة (زر Supabase → رفع)</p>
             </div>
           </div>
           <Footer />
@@ -901,11 +971,11 @@ export default function App() {
     }
   }
   if (!currentUser) {
-    // === مسار ولي الأمر عبر ?t= — عرض مباشر بدون تسجيل (حذف نهائي لعناصر الكرت الأبيض من هذا المسار أيضاً) ===
+    // === مسار ولي الأمر عبر ?t= — عرض مباشر بدون تسجيل (مع جلب سحابي) ===
     const _parentParams = new URLSearchParams(window.location.search)
     const _parentToken = _parentParams.get("t")
-    let _parentStudent: Student | null = null
-    if (_parentToken) {
+    let _parentStudent: Student | null = parentCloudStudent
+    if (!_parentStudent && _parentToken) {
       _parentStudent = students.find(x => x.accessToken === _parentToken) || null
       if (!_parentStudent) {
         try {
@@ -925,6 +995,20 @@ export default function App() {
       )
     }
     if (_parentToken && !_parentStudent) {
+      if (parentCloudLoading) {
+        return (
+          <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
+            <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+              <div className="bg-white rounded-2xl border p-8 text-center max-w-sm shadow-sm">
+                <div className="w-10 h-10 border-4 border-[#1F5E3A]/20 border-t-[#1F5E3A] rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="font-bold text-sm" style={{color:"#163F27"}}>جاري تحميل بيانات الطالب...</p>
+                <p className="text-xs text-gray-400 mt-2">يتم الجلب من السحابة — لحظات</p>
+              </div>
+            </div>
+            <Footer />
+          </div>
+        )
+      }
       return (
         <div className="min-h-screen flex flex-col" style={{ background: "#FAF9F4" }}>
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
@@ -932,7 +1016,7 @@ export default function App() {
               <p className="text-2xl mb-2">🔗</p>
               <p className="font-bold text-sm" style={{color:"#163F27"}}>رابط المتابعة غير صالح أو منتهي</p>
               <p className="text-xs text-gray-500 mt-1 leading-5">تأكد من نسخ الرابط كاملاً من المعلم أو تواصل معه للحصول على رابط جديد.</p>
-              <p className="text-[11px] text-gray-400 mt-3">هذا الرابط مخصص لولي الأمر — للاستفسار تواصل مع المعلم على واتساب</p>
+              <p className="text-[11px] text-gray-400 mt-3">إذا كان الرابط صحيحاً، تأكد أن المعلم رفع البيانات إلى السحابة</p>
             </div>
           </div>
           <Footer />
@@ -2144,9 +2228,10 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 }) {
   const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
   const link = linkForStudent(student)
-  const waText = `السلام عليكم ورحمة الله،\nرابط متابعة إنجاز الطالب في حلقة القرآن الكريم (${student.name}):\n${link}`
+  const waText = `السلام عليكم ورحمة الله،\nرابط متابعة الطالب ${student.name} (${circleName}) في حلقتي:\n${link}`
   const waDigits = toWhatsAppDigits(student.phone || "")
-  const waLink = waDigits ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
+  const isValidWa = !!waDigits && waDigits.length === 12 && /^9665\d{8}$/.test(waDigits)
+  const waLink = isValidWa ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
   const waGeneral = `https://wa.me/?text=${encodeURIComponent(waText)}`
   const totalAyah = student.memorizationLog.reduce((a, b) => a + b.ayahCount, 0)
   const totalReview = student.reviewLog.reduce((a, b) => a + b.ayahCount, 0)
@@ -2155,6 +2240,41 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
     const all = [...student.memorizationLog, ...student.reviewLog].sort((a, b) => a.date.localeCompare(b.date))
     let cum = 0; return all.map(e => { cum += (e as any).ayahCount; return { date: e.date.slice(5), cum } }).slice(-10)
   }, [student])
+
+  // ===== المطلوب غداً — آخر تسجيل لكل نوع =====
+  const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
+  const latestMem = React.useMemo(() => {
+    if (!student.memorizationLog.length) return null
+    return [...student.memorizationLog].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as MemorizationEntry
+  }, [student])
+  const latestSmall = React.useMemo(() => {
+    const arr = student.reviewLog.filter(x=> x.reviewType === "small")
+    if (!arr.length) return null
+    return [...arr].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as ReviewEntry
+  }, [student])
+  const latestLarge = React.useMemo(() => {
+    const arr = student.reviewLog.filter(x=> x.reviewType === "large")
+    if (!arr.length) return null
+    return [...arr].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id))[0] as ReviewEntry
+  }, [student])
+  const previousCombined = React.useMemo(() => {
+    const list: Array<{ key: string; type: "mem"|"small"|"large"; date: string; sortKey: string }> = []
+    const memPrev = latestMem ? student.memorizationLog.filter(x=> x.id !== latestMem.id) : student.memorizationLog
+    const smallPrev = latestSmall ? student.reviewLog.filter(x=> x.id !== latestSmall.id && x.reviewType==="small") : student.reviewLog.filter(x=> x.reviewType==="small")
+    const largePrev = latestLarge ? student.reviewLog.filter(x=> x.id !== latestLarge.id && x.reviewType==="large") : student.reviewLog.filter(x=> x.reviewType==="large")
+    memPrev.forEach(e=> list.push({ key: e.id, type: "mem", date: e.date, sortKey: e.date + e.id }))
+    smallPrev.forEach(e=> list.push({ key: e.id, type: "small", date: e.date, sortKey: e.date + e.id }))
+    largePrev.forEach(e=> list.push({ key: e.id, type: "large", date: e.date, sortKey: e.date + e.id }))
+    return list.sort((a,b)=> b.sortKey.localeCompare(a.sortKey))
+  }, [student, latestMem, latestSmall, latestLarge])
+  const filteredPrev = React.useMemo(() => {
+    if (historyFilter === "mem") return previousCombined.filter(x=> x.type==="mem")
+    if (historyFilter === "review") return previousCombined.filter(x=> x.type!=="mem")
+    return previousCombined
+  }, [previousCombined, historyFilter])
+  const memMap = React.useMemo(()=> new Map(student.memorizationLog.map(e=>[e.id, e] as const)), [student])
+  const reviewMap = React.useMemo(()=> new Map(student.reviewLog.map(e=>[e.id, e] as const)), [student])
+  const hasAnyRequired = !!(latestMem || latestSmall || latestLarge)
 
   const copyLink = () => { navigator.clipboard.writeText(link); }
   return (
@@ -2171,7 +2291,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Share */}
+        {/* Share — واتساب مصلح */}
         <div className="bg-white rounded-2xl border p-4">
           <p className="font-bold text-xs mb-2">رابط المتابعة لولي الأمر</p>
           <div className="flex gap-2">
@@ -2179,9 +2299,11 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             <button onClick={copyLink} className="px-3 py-2 rounded-xl bg-[#1F5E3A] text-white text-xs font-bold">نسخ</button>
           </div>
           <div className="flex gap-2 mt-2">
-            <a href={student.phone ? waLink : waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 rounded-xl bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-bold">📱 واتساب لولي الأمر</a>
+            <a href={isValidWa ? waLink : waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2 rounded-xl bg-[#25D366] hover:bg-[#1da851] text-white text-xs font-bold">📱 واتساب لولي الأمر</a>
             <a href={waGeneral} target="_blank" rel="noreferrer" className="px-4 py-2 rounded-xl bg-white border text-xs font-bold">مشاركة عامة</a>
           </div>
+          {!isValidWa && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2 leading-5">⚠️ رقم جوال ولي الأمر غير صحيح أو غير مدخل — سيُفتح واتساب للمشاركة العامة. أدخل رقم 05XXXXXXXX في تعديل الطالب ليُرسل مباشرة لولي الأمر.</p>}
+          {isValidWa && <p className="text-[10px] text-gray-400 mt-2">سيُرسل إلى: ‎+{waDigits} — الرابط يعمل على أي جهاز بعد رفع البيانات للسحابة</p>}
           {(() => { const _visitedToday = (student.visitLog || []).some(v => v.date === todayISO()); return (<div className="mt-3 flex flex-col gap-1"><span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border w-fit ${ _visitedToday ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}><span className={`w-1.5 h-1.5 rounded-full ${ _visitedToday ? "bg-emerald-500" : "bg-amber-500"}`}></span>{_visitedToday ? "✓ زار رابط المتابعة اليوم" : "○ لم يزر رابط المتابعة اليوم"}</span><span className="text-[10px] text-gray-400">يتجدد تلقائياً كل يوم — يظهر "زار" فقط إذا دخل ولي الأمر رابط المتابعة خلال اليوم الحالي</span></div>)})()}
         </div>
 
@@ -2193,45 +2315,180 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           <MiniStat label="عدد الأخطاء" value={String(student.errorsLog.length)} />
         </div>
 
-        {/* Memorization */}
-        <Section title="سجل التسميعات" emptyText="لا يوجد سجل حفظ بعد" count={student.memorizationLog.length} actionLabel="+ تسجيل حفظ جديد" onAction={onAddMem} hideAction={readOnly}>
-          <div className="space-y-2 max-h-[280px] overflow-auto pr-1">
-            {student.memorizationLog.map(e => (
-              <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-gray-50">
-                <div>
-                  <p className="font-bold text-xs">سورة {e.surahName} — من الآية {e.fromAyah} إلى {e.toAyah} <span className="text-gray-400">({e.ayahCount} آية)</span></p>
-                  <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • المعلم: {staff.find(s => s.id === e.teacherId)?.name || "—"}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[e.grade] }}>{e.grade}</span>
-                  {!readOnly && <button onClick={() => { if (confirm("حذف التسجيل؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== e.id) }) }} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
-                </div>
-              </div>
-            ))}
+        {/* ===== المطلوب غداً — آخر تسجيل لكل نوع في مكان واحد (بدون اسم المعلم) ===== */}
+        <div className="space-y-3">
+          <div className="bg-[#1F5E3A] rounded-2xl p-4 shadow-sm text-center">
+            <h4 className="font-black text-sm text-white">المطلوب غداً</h4>
+            <p className="text-[11px] text-white/70 mt-1">آخر حفظ وآخر مراجعة صغرى وكبرى — هو المطلوب الحالي</p>
           </div>
-        </Section>
 
-        {/* Review small / large */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <Section title="1. مراجعة صغرى" subtitle="الماضي القريب" count={student.reviewLog.filter(x => x.reviewType === "small").length} emptyText="لا توجد مراجعات صغرى" actionLabel="+ تسجيل مراجعة صغرى" onAction={onAddSmall} hideAction={readOnly}>
-            <div className="space-y-2 max-h-[240px] overflow-auto pr-1">
-              {student.reviewLog.filter(x => x.reviewType === "small").map(e => (
-                <LogRow key={e.id} e={e} staff={staff} onDelete={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} hideDelete={readOnly} />
-              ))}
-              {student.reviewLog.filter(x => x.reviewType === "small").length === 0 && <p className="text-xs text-gray-400 text-center py-4">لا توجد تسجيلات بعد</p>}
+          <div className="grid md:grid-cols-3 gap-3">
+            {/* حفظ جديد */}
+            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestMem ? "#1F5E3A" : "#E1E5DA"}}>
+              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestMem ? "#1F5E3A" : "#F3F4F6"}}>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestMem ? "white" : "#6B7280"}}>📖 حفظ جديد</p>
+                {latestMem && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestMem.ayahCount} آية</span>}
+              </div>
+              <div className="p-3">
+                {latestMem ? (
+                  <div>
+                    <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestMem.surahName}</p>
+                    <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestMem.fromAyah} إلى {latestMem.toAyah}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestMem.grade]}}>{latestMem.grade}</span>
+                      <span className="text-[11px] text-gray-500">{fmtBoth(latestMem.date)}</span>
+                    </div>
+                    {!readOnly && <button onClick={() => { if (confirm("حذف هذا الحفظ؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== latestMem.id) }) }} className="mt-2 text-[11px] px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold w-full">حذف</button>}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-2xl mb-1">📭</p>
+                    <p className="text-xs font-bold text-gray-600">لا يوجد حفظ مسجل</p>
+                    <p className="text-[11px] text-gray-400 mt-1">سيظهر هنا عند التسجيل</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </Section>
-          <Section title="2. مراجعة كبرى" subtitle="الماضي البعيد" count={student.reviewLog.filter(x => x.reviewType === "large").length} emptyText="لا توجد مراجعات كبرى" actionLabel="+ تسجيل مراجعة كبرى" onAction={onAddLarge} hideAction={readOnly}>
-            <div className="space-y-2 max-h-[240px] overflow-auto pr-1">
-              {student.reviewLog.filter(x => x.reviewType === "large").map(e => (
-                <LogRow key={e.id} e={e} staff={staff} onDelete={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} hideDelete={readOnly} />
-              ))}
-              {student.reviewLog.filter(x => x.reviewType === "large").length === 0 && <p className="text-xs text-gray-400 text-center py-4">لا توجد تسجيلات بعد</p>}
+
+            {/* مراجعة صغرى */}
+            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestSmall ? "#1F5E3A" : "#E1E5DA"}}>
+              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestSmall ? "#1F5E3A" : "#F3F4F6"}}>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestSmall ? "white" : "#6B7280"}}>🔁 مراجعة صغرى</p>
+                {latestSmall && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestSmall.ayahCount} آية</span>}
+              </div>
+              <div className="p-3">
+                {latestSmall ? (
+                  <div>
+                    <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestSmall.surahName}</p>
+                    <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestSmall.fromAyah} إلى {latestSmall.toAyah}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestSmall.grade]}}>{latestSmall.grade}</span>
+                      <span className="text-[11px] text-gray-500">{fmtBoth(latestSmall.date)}</span>
+                    </div>
+                    {!readOnly && <button onClick={() => { if (confirm("حذف هذه المراجعة الصغرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestSmall.id) }) }} className="mt-2 text-[11px] px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold w-full">حذف</button>}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-2xl mb-1">📭</p>
+                    <p className="text-xs font-bold text-gray-600">لا توجد مراجعة صغرى</p>
+                    <p className="text-[11px] text-gray-400 mt-1">الماضي القريب</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </Section>
+
+            {/* مراجعة كبرى */}
+            <div className="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" style={{borderColor: latestLarge ? "#1F5E3A" : "#E1E5DA"}}>
+              <div className="px-3 py-2 flex items-center justify-between" style={{background: latestLarge ? "#1F5E3A" : "#F3F4F6"}}>
+                <p className="font-black text-xs flex items-center gap-1.5" style={{color: latestLarge ? "white" : "#6B7280"}}>📚 مراجعة كبرى</p>
+                {latestLarge && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#1F5E3A]">{latestLarge.ayahCount} آية</span>}
+              </div>
+              <div className="p-3">
+                {latestLarge ? (
+                  <div>
+                    <p className="font-black text-sm" style={{color:"#163F27"}}>سورة {latestLarge.surahName}</p>
+                    <p className="text-xs font-bold mt-1" style={{color:"#1F5E3A"}}>من الآية {latestLarge.fromAyah} إلى {latestLarge.toAyah}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[latestLarge.grade]}}>{latestLarge.grade}</span>
+                      <span className="text-[11px] text-gray-500">{fmtBoth(latestLarge.date)}</span>
+                    </div>
+                    {!readOnly && <button onClick={() => { if (confirm("حذف هذه المراجعة الكبرى؟")) onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== latestLarge.id) }) }} className="mt-2 text-[11px] px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-bold w-full">حذف</button>}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-2xl mb-1">📭</p>
+                    <p className="text-xs font-bold text-gray-600">لا توجد مراجعة كبرى</p>
+                    <p className="text-[11px] text-gray-400 mt-1">الماضي البعيد</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {!hasAnyRequired && (
+            <div className="bg-[#FAF9F4] border border-[#E1E5DA] rounded-2xl p-3 text-center">
+              <p className="text-xs font-bold" style={{color:"#163F27"}}>لم يسجّل أي حفظ أو مراجعة بعد</p>
+              <p className="text-[11px] text-gray-500 mt-1">استخدم الأزرار أدناه لإضافة أول تسميع</p>
+            </div>
+          )}
+
+          {!readOnly && (
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={onAddMem} className="py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">+ حفظ جديد</button>
+              <button onClick={onAddSmall} className="py-2.5 rounded-xl bg-white border-2 border-[#1F5E3A] text-[#1F5E3A] text-xs font-bold hover:bg-[#E7EFE7]">+ صغرى</button>
+              <button onClick={onAddLarge} className="py-2.5 rounded-xl bg-white border-2 border-[#1F5E3A] text-[#1F5E3A] text-xs font-bold hover:bg-[#E7EFE7]">+ كبرى</button>
+            </div>
+          )}
         </div>
 
-
+        {/* ===== السجل السابق — كل القديم في مكان واحد (بدون اسم المعلم) ===== */}
+        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b bg-[#FAF9F4]/70 flex flex-wrap items-center justify-between gap-3">
+            <h4 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>
+              📂 السجل السابق
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border text-gray-600">{previousCombined.length} سجل</span>
+              <span className="hidden sm:inline text-[11px] font-normal text-gray-400">— ما عدا المطلوب أعلاه</span>
+            </h4>
+            <div className="flex gap-1 p-1 rounded-full bg-gray-100 border">
+              <button onClick={()=> setHistoryFilter("all")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="all" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>الكل</button>
+              <button onClick={()=> setHistoryFilter("mem")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="mem" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>حفظ فقط</button>
+              <button onClick={()=> setHistoryFilter("review")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="review" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>مراجعة فقط</button>
+            </div>
+          </div>
+          <div className="p-4">
+            {filteredPrev.length===0 ? (
+              <div className="text-center py-8">
+                <p className="text-2xl mb-2">✨</p>
+                <p className="text-xs font-bold text-gray-600">{previousCombined.length===0 ? "لا يوجد سجل سابق بعد" : "لا توجد سجلات في هذا الفلتر"}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{previousCombined.length===0 ? "سيظهر هنا سجلك السابق بعد إضافة أكثر من تسميع" : "جرّب فلتراً آخر"}</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[420px] overflow-auto pr-1">
+                {filteredPrev.map(item => {
+                  if (item.type==="mem") {
+                    const e = memMap.get(item.key) as MemorizationEntry
+                    if (!e) return null
+                    return (
+                      <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-[#FAF9F4]/60 hover:bg-white transition">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>📖</span>
+                          <div>
+                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
+                            <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                          {!readOnly && <button onClick={() => { if (confirm("حذف التسجيل؟")) onUpdate({ ...student, memorizationLog: student.memorizationLog.filter(x => x.id !== e.id) }) }} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
+                        </div>
+                      </div>
+                    )
+                  } else {
+                    const e = reviewMap.get(item.key) as ReviewEntry
+                    if (!e) return null
+                    const isSmall = e.reviewType==="small"
+                    return (
+                      <div key={e.id} className="flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-[#FAF9F4]/50 transition">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7", color:"#1F5E3A"}}>{isSmall ? "🔁" : "📚"}</span>
+                          <div>
+                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {e.ayahCount} آية)</span></p>
+                            <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{background: GRADE_COLOR[e.grade]}}>{e.grade}</span>
+                          {!readOnly && <button onClick={() => onUpdate({ ...student, reviewLog: student.reviewLog.filter(x => x.id !== e.id) })} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>}
+                        </div>
+                      </div>
+                    )
+                  }
+                })}
+              </div>
+            )}
+            {filteredPrev.length>0 && <p className="text-center text-[11px] text-gray-400 mt-3">💡 هذا هو سجلك السابق — المطلوب الحالي معروض في الأعلى</p>}
+          </div>
+        </div>
 
         {/* Errors */}
         <Section title="الأخطاء" count={student.errorsLog.length} emptyText="لا يوجد أخطاء، ما شاء الله!" actionLabel="+ تسجيل خطأ" onAction={onAddError} hideAction={readOnly}>
@@ -2283,7 +2540,6 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
 
 
-
         <div className="pb-6" />
       </div>
     </div>
@@ -2309,7 +2565,7 @@ function LogRow({ e, staff, onDelete, hideDelete }: { e: ReviewEntry; staff: Sta
     <div className="flex items-center justify-between p-2.5 rounded-xl border bg-white">
       <div>
         <p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({e.ayahCount} آية)</p>
-        <p className="text-[11px] text-gray-500">{fmtBoth(e.date)} • {staff.find(s => s.id === e.teacherId)?.name || "—"}</p>
+        <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-[11px] font-bold px-2 py-1 rounded-full text-white" style={{ background: GRADE_COLOR[e.grade] }}>{e.grade}</span>
