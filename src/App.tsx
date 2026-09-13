@@ -104,7 +104,46 @@ const calcWajh = (surahNum: number, fromAyah: number, toAyah: number): number =>
   const p2 = pageForAyah(surahNum, clampedTo)
   return Math.max(1, p2 - p1 + 1)
 }
-const calcWajhForRange = (surahNum: number, fromAyah: number, toAyah: number): number => calcWajh(surahNum, fromAyah, toAyah)
+const calcWajhForRange = (surahNum: number, fromAyah: number, toAyah: number): number => calcWajhFraction(surahNum, fromAyah, toAyah)
+// حساب دقيق بالكسور: ربع/نصف/ثلاثة أرباع وجه حسب آيات الصفحة
+const calcWajhFraction = (surahNum: number, fromAyah: number, toAyah: number): number => {
+  const s = SURAHS.find(x=>x.number===surahNum)
+  if(!s) return Math.max(0, toAyah - fromAyah + 1) / 7 // تقريبي
+  const from = Math.max(1, Math.min(fromAyah, s.ayahCount))
+  const to = Math.max(1, Math.min(toAyah, s.ayahCount))
+  if(from>to) return 0
+  const gStart = globalAyahNumber(surahNum, from)
+  const gEnd = globalAyahNumber(surahNum, to)
+  let total = 0
+  for(let i=0;i<PAGE_STARTS.length;i++){
+    const pStart = PAGE_STARTS[i]
+    const pEnd = i+1 < PAGE_STARTS.length ? PAGE_STARTS[i+1]-1 : 6236
+    if(gEnd < pStart || gStart > pEnd) continue
+    const oStart = Math.max(gStart, pStart)
+    const oEnd = Math.min(gEnd, pEnd)
+    const overlap = oEnd - oStart + 1
+    const pageLen = pEnd - pStart + 1
+    total += overlap / pageLen
+  }
+  return total
+}
+const formatWajh = (f: number): string => {
+  const r = Math.round(f*4)/4
+  if(r===0) return "0 وجه"
+  if(r===0.25) return "ربع وجه"
+  if(r===0.5) return "نصف وجه"
+  if(r===0.75) return "ثلاثة أرباع وجه"
+  if(r===1) return "وجه"
+  const intPart = Math.floor(r)
+  const frac = r - intPart
+  if(frac===0) return `${intPart} ${intPart===1 ? "وجه" : intPart===2 ? "وجهان" : "أوجه"}`
+  if(frac===0.25) return intPart ? `${intPart} وربع وجه` : "ربع وجه"
+  if(frac===0.5) return intPart ? `${intPart} ونصف وجه` : "نصف وجه"
+  if(frac===0.75) return intPart ? `${intPart} وثلاثة أرباع وجه` : "ثلاثة أرباع وجه"
+  return `${r} وجه`
+}
+const calcWajhDisplay = (surahNum: number, fromAyah: number, toAyah: number): string => formatWajh(calcWajhFraction(surahNum, fromAyah, toAyah))
+
 
 const GRADES: Grade[] = ["بدون تقدير", "ممتاز", "جيد جداً", "جيد", "يحتاج إعادة"]
 const GRADE_COLOR: Record<string, string> = { "ممتاز": "#1F5E3A", "جيد": "#C9A227", "جيد جداً": "#3F8F5F", "جيد جدًا": "#3F8F5F", "يحتاج إعادة": "#B3492C", "بدون تقدير": "#9CA3AF" }
@@ -570,8 +609,12 @@ export default function App() {
   // Add logs modals
   const [showMemModal, setShowMemModal] = useState(false)
   const [memForm, setMemForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "بدون تقدير" as Grade, date: todayISO(), notes: "" })
+  const [memSearch, setMemSearch] = useState("")
+  const [memSelected, setMemSelected] = useState<Array<{surahNumber:number, fromAyah:number, toAyah:number}>>([{surahNumber:114, fromAyah:1, toAyah:6}])
   const [showReviewModal, setShowReviewModal] = useState<ReviewType | null>(null)
   const [reviewForm, setReviewForm] = useState({ surahNumber: 114, fromAyah: 1, toAyah: 6, grade: "بدون تقدير" as Grade, date: todayISO() })
+  const [reviewSearch, setReviewSearch] = useState("")
+  const [reviewSelected, setReviewSelected] = useState<Array<{surahNumber:number, fromAyah:number, toAyah:number}>>([{surahNumber:114, fromAyah:1, toAyah:6}])
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorForm, setErrorForm] = useState({ type: "خطأ في الحفظ" as ErrorType, description: "", date: todayISO() })
   const [showNoteModal, setShowNoteModal] = useState(false)
@@ -1043,31 +1086,37 @@ export default function App() {
 
   const handleAddMemorization = () => {
     if (!selectedStudent) return
-    const surah = SURAHS.find(s => s.number === memForm.surahNumber)!
-    if (memForm.fromAyah < 1 || memForm.toAyah > surah.ayahCount || memForm.fromAyah > memForm.toAyah) { showToast("تحقق من رقم الآيات"); return }
     const effectiveMemDate = ensureRecitationDate(memForm.date, plan)
-    const entry: MemorizationEntry = {
-      id: uid(), date: effectiveMemDate, surahNumber: surah.number, surahName: surah.name,
-      fromAyah: memForm.fromAyah, toAyah: memForm.toAyah, ayahCount: memForm.toAyah - memForm.fromAyah + 1,
-      grade: memForm.grade, teacherId: currentUserId || "", notes: memForm.notes
+    const list = memSelected.length ? memSelected : [{surahNumber: memForm.surahNumber, fromAyah: memForm.fromAyah, toAyah: memForm.toAyah}]
+    for(const sel of list){
+      const s = SURAHS.find(x=>x.number===sel.surahNumber)!
+      if(sel.fromAyah<1 || sel.toAyah> s.ayahCount || sel.fromAyah> sel.toAyah){ showToast(`تحقق من الآيات في سورة ${s.name}`); return }
     }
-    const updated = { ...selectedStudent, memorizationLog: [entry, ...selectedStudent.memorizationLog] }
+    const entries: MemorizationEntry[] = list.map(sel=>{
+      const s = SURAHS.find(x=>x.number===sel.surahNumber)!
+      return { id: uid(), date: effectiveMemDate, surahNumber: s.number, surahName: s.name, fromAyah: sel.fromAyah, toAyah: sel.toAyah, ayahCount: sel.toAyah - sel.fromAyah + 1, grade: memForm.grade, teacherId: currentUserId || "", notes: memForm.notes || undefined }
+    })
+    const updated = { ...selectedStudent, memorizationLog: [...entries, ...selectedStudent.memorizationLog] }
     persistStudent(updated)
-    setShowMemModal(false); showToast(effectiveMemDate !== memForm.date ? `تم تسجيل الحفظ ليوم ${fmtBoth(effectiveMemDate)} ✓ (نُقل من إجازة)` : `تم تسجيل الحفظ ليوم ${fmtBoth(effectiveMemDate)} ✓`)
+    const totalW = entries.reduce((a,e)=> a+calcWajhFraction(e.surahNumber,e.fromAyah,e.toAyah),0)
+    setShowMemModal(false); setMemSelected([{surahNumber:114, fromAyah:1, toAyah:6}]); setMemSearch(""); showToast(effectiveMemDate !== memForm.date ? `تم تسجيل الحفظ (${entries.length} سور) ليوم ${fmtBoth(effectiveMemDate)} ✓ — ${formatWajh(totalW)}` : `تم تسجيل الحفظ (${entries.length} سور) ✓ — ${formatWajh(totalW)}`)
   }
   const handleAddReview = () => {
     if (!selectedStudent || !showReviewModal) return
-    const surah = SURAHS.find(s => s.number === reviewForm.surahNumber)!
-    if (reviewForm.fromAyah < 1 || reviewForm.toAyah > surah.ayahCount || reviewForm.fromAyah > reviewForm.toAyah) { showToast("تحقق من الآيات"); return }
     const effectiveReviewDate = ensureRecitationDate(reviewForm.date, plan)
-    const entry: ReviewEntry = {
-      id: uid(), date: effectiveReviewDate, reviewType: showReviewModal,
-      surahNumber: surah.number, surahName: surah.name, fromAyah: reviewForm.fromAyah, toAyah: reviewForm.toAyah,
-      ayahCount: reviewForm.toAyah - reviewForm.fromAyah + 1, grade: reviewForm.grade, teacherId: currentUserId || ""
+    const list = reviewSelected.length ? reviewSelected : [{surahNumber: reviewForm.surahNumber, fromAyah: reviewForm.fromAyah, toAyah: reviewForm.toAyah}]
+    for(const sel of list){
+      const s = SURAHS.find(x=>x.number===sel.surahNumber)!
+      if(sel.fromAyah<1 || sel.toAyah> s.ayahCount || sel.fromAyah> sel.toAyah){ showToast(`تحقق من الآيات في سورة ${s.name}`); return }
     }
-    const updated = { ...selectedStudent, reviewLog: [entry, ...selectedStudent.reviewLog] }
+    const entries: ReviewEntry[] = list.map(sel=>{
+      const s = SURAHS.find(x=>x.number===sel.surahNumber)!
+      return { id: uid(), date: effectiveReviewDate, reviewType: showReviewModal!, surahNumber: s.number, surahName: s.name, fromAyah: sel.fromAyah, toAyah: sel.toAyah, ayahCount: sel.toAyah - sel.fromAyah + 1, grade: reviewForm.grade, teacherId: currentUserId || "" }
+    })
+    const updated = { ...selectedStudent, reviewLog: [...entries, ...selectedStudent.reviewLog] }
     persistStudent(updated)
-    setShowReviewModal(null); showToast(effectiveReviewDate !== reviewForm.date ? `تم تسجيل المراجعة ليوم ${fmtBoth(effectiveReviewDate)} ✓ (نُقل من إجازة)` : `تم تسجيل المراجعة ليوم ${fmtBoth(effectiveReviewDate)} ✓`)
+    const totalW = entries.reduce((a,e)=> a+calcWajhFraction(e.surahNumber,e.fromAyah,e.toAyah),0)
+    setShowReviewModal(null); setReviewSelected([{surahNumber:114, fromAyah:1, toAyah:6}]); setReviewSearch(""); showToast(effectiveReviewDate !== reviewForm.date ? `تم تسجيل المراجعة (${entries.length} سور) ليوم ${fmtBoth(effectiveReviewDate)} ✓ — ${formatWajh(totalW)}` : `تم تسجيل المراجعة (${entries.length} سور) ✓ — ${formatWajh(totalW)}`)
   }
   const handleAddError = () => {
     if (!selectedStudent) return
@@ -1691,7 +1740,7 @@ export default function App() {
             {visibleStudents.map(s => {
               const circleName2 = circles.find(c => c.id === s.circleId)?.name || "بدون حلقة"
               const lastGrade = s.memorizationLog[0]?.grade
-              const totalAyahs = s.memorizationLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
+              const totalAyahs = s.memorizationLog.reduce((a, b) => a + calcWajhFraction(b.surahNumber, b.fromAyah, b.toAyah), 0)
               return (
                 <div key={s.id} onClick={() => setSelectedStudentId(s.id)} className="bg-white rounded-2xl border border-[#E1E5DA] p-4 shadow-sm hover:shadow-md hover:border-[#1F5E3A]/20 cursor-pointer transition group">
                   <div className="flex items-start justify-between mb-3">
@@ -1714,7 +1763,7 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-gray-500 mb-3">
-                    <span>أوجه محفوظة: <b style={{ color: "#1F5E3A" }}>{totalAyahs}</b></span>
+                    <span>أوجه محفوظة: <b style={{ color: "#1F5E3A" }}>{formatWajh(totalAyahs)}</b></span>
                     <span>الحفظ القادم: {s.memorizationLog[0] ? `${s.memorizationLog[0].surahName} ${s.memorizationLog[0].toAyah + 1}` : "—"}</span>
                   </div>
 
@@ -1830,13 +1879,54 @@ export default function App() {
         <Modal title="+ تسجيل حفظ جديد" onClose={() => setShowMemModal(false)}>
           <div className="grid gap-3">
             <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={memForm.date} onChange={e => setMemForm({ ...memForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><div className={`mt-1.5 text-[11px] px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 ${getDayType(memForm.date, plan).type==="recitation" ? "bg-[#E7EFE7] border-[#A5D6A7] text-[#1F5E3A]" : "bg-amber-50 border-amber-200 text-amber-800"}`}><span>📅</span><span className="font-bold">{fmtBoth(memForm.date)}</span>{getDayType(memForm.date, plan).type!=="recitation" && <span>— إجازة → سيُنقل إلى {fmtBoth(ensureRecitationDate(memForm.date, plan))}</span>}{getDayType(memForm.date, plan).type==="recitation" && <span>✓ يوم تسميع</span>}</div><p className="text-[10px] text-gray-400 mt-1">تلقائي ليوم: {fmtBoth(getNextRecitationISO(todayISO(), plan))} — إذا وافق إجازة ينتقل لأقرب يوم تسميع حسب الخطة</p></div>
-            <div><label className="text-xs font-bold">السورة</label>
-              <select value={memForm.surahNumber} onChange={e => { const n = Number(e.target.value); const s = SURAHS.find(x => x.number === n)!; setMemForm({ ...memForm, surahNumber: n, fromAyah: 1, toAyah: Math.min(7, s.ayahCount) }) }} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm max-h-[200px]">
-                {[...SURAHS].reverse().map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
-              </select></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-xs font-bold">من آية</label><input type="number" value={memForm.fromAyah} onChange={e => setMemForm({ ...memForm, fromAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
-              <div><label className="text-xs font-bold">إلى آية</label><input type="number" value={memForm.toAyah} onChange={e => setMemForm({ ...memForm, toAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+            <div>
+              <label className="text-xs font-bold">السور — انقر من نفس القائمة لاختيار أكثر من سورة</label>
+              <div className="relative mt-1">
+                <input value={memSearch} onChange={e=> setMemSearch(e.target.value)} placeholder="ابحث بالاسم أو الرقم — انقر لإضافة" className="w-full px-3 py-2 rounded-xl border text-sm pr-9 bg-white" />
+                <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
+              </div>
+              <div className="mt-1 max-h-[120px] overflow-auto border rounded-xl bg-white">
+                {(memSearch.trim() ? SURAHS.filter(s=> s.name.includes(memSearch.trim()) || String(s.number).includes(memSearch.trim())) : SURAHS).slice(0,30).map(s=> {
+                  const isSelected = memSelected.some(x=> x.surahNumber===s.number)
+                  return (
+                    <label key={s.number} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#FAF9F4] ${isSelected ? "bg-[#E7EFE7]" : ""}`}>
+                      <input type="checkbox" checked={isSelected} onChange={()=> {
+                        if(isSelected) setMemSelected(prev=> prev.filter(x=> x.surahNumber!==s.number))
+                        else setMemSelected(prev=> [...prev, {surahNumber: s.number, fromAyah:1, toAyah: Math.min(7, s.ayahCount)}])
+                      }} className="accent-[#1F5E3A]" />
+                      <span className="text-xs flex-1">{s.number} — {s.name} ({s.ayahCount} آية)</span>
+                      {isSelected && <span className="text-[10px] text-[#1F5E3A] font-bold">✓</span>}
+                    </label>
+                  )
+                })}
+              </div>
+              {memSelected.length>0 && (
+                <div className="mt-2 space-y-2">
+                  <p className="text-[11px] font-bold text-[#1F5E3A]">المختارة ({memSelected.length}) — حدد الآيات لكل سورة:</p>
+                  {memSelected.map(sel=>{
+                    const surah = SURAHS.find(x=>x.number===sel.surahNumber)!
+                    const w = calcWajhDisplay(sel.surahNumber, sel.fromAyah, sel.toAyah)
+                    return (
+                      <div key={sel.surahNumber} className="bg-[#FAF9F4] rounded-xl border p-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs" style={{color:"#163F27"}}>{surah.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border text-[#1F5E3A]">{w}</span>
+                            <button onClick={()=> setMemSelected(prev=> prev.filter(x=> x.surahNumber!==sel.surahNumber))} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-1.5">
+                          <div><label className="text-[11px] font-bold">من آية</label><div className="flex items-center gap-1 mt-1"><button type="button" onClick={()=> setMemSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, fromAyah: Math.max(1, x.fromAyah-1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">−</button><input type="number" value={sel.fromAyah} onChange={e=> setMemSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, fromAyah: Number(e.target.value)||1} : x))} className="flex-1 px-2 py-1.5 rounded-lg border text-center text-sm font-bold" /><button type="button" onClick={()=> setMemSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, fromAyah: Math.min(surah.ayahCount, x.fromAyah+1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">+</button></div></div>
+                          <div><label className="text-[11px] font-bold">إلى آية</label><div className="flex items-center gap-1 mt-1"><button type="button" onClick={()=> setMemSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, toAyah: Math.max(x.fromAyah, x.toAyah-1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">−</button><input type="number" value={sel.toAyah} onChange={e=> setMemSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, toAyah: Number(e.target.value)||1} : x))} className="flex-1 px-2 py-1.5 rounded-lg border text-center text-sm font-bold" /><button type="button" onClick={()=> setMemSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, toAyah: Math.min(surah.ayahCount, x.toAyah+1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">+</button></div></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="bg-[#E7EFE7] rounded-xl border border-[#A5D6A7] p-2 text-center">
+                    <span className="text-xs font-bold" style={{color:"#1F5E3A"}}>الإجمالي: {formatWajh(memSelected.reduce((a,s)=> a+calcWajhFraction(s.surahNumber,s.fromAyah,s.toAyah),0))} ({memSelected.length} سور)</span>
+                  </div>
+                </div>
+              )}
             </div>
             <div><label className="text-xs font-bold">التقدير</label>
               <select value={memForm.grade} onChange={e => setMemForm({ ...memForm, grade: e.target.value as Grade })} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
@@ -1853,13 +1943,54 @@ export default function App() {
           <p className="text-xs text-gray-500 mb-3">{showReviewModal === "small" ? "مخصصة للمراجعة القريبة واليومية (الماضي القريب)" : "مخصصة للمراجعة التراكمية البعيدة"}</p>
           <div className="grid gap-3">
             <div><label className="text-xs font-bold">التاريخ — يوم التسميع (مسبوق بيوم تلقائياً)</label><input type="date" value={reviewForm.date} onChange={e => setReviewForm({ ...reviewForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /><div className={`mt-1.5 text-[11px] px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 ${getDayType(reviewForm.date, plan).type==="recitation" ? "bg-[#E7EFE7] border-[#A5D6A7] text-[#1F5E3A]" : "bg-amber-50 border-amber-200 text-amber-800"}`}><span>📅</span><span className="font-bold">{fmtBoth(reviewForm.date)}</span>{getDayType(reviewForm.date, plan).type!=="recitation" && <span>— إجازة → سيُنقل إلى {fmtBoth(ensureRecitationDate(reviewForm.date, plan))}</span>}{getDayType(reviewForm.date, plan).type==="recitation" && <span>✓ يوم تسميع</span>}</div><p className="text-[10px] text-gray-400 mt-1">تلقائي ليوم: {fmtBoth(getNextRecitationISO(todayISO(), plan))} — إذا وافق إجازة ينتقل لأقرب يوم تسميع</p></div>
-            <div><label className="text-xs font-bold">السورة</label>
-              <select value={reviewForm.surahNumber} onChange={e => { const n = Number(e.target.value); const s = SURAHS.find(x => x.number === n)!; setReviewForm({ ...reviewForm, surahNumber: n, fromAyah: 1, toAyah: Math.min(10, s.ayahCount) }) }} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
-                {[...SURAHS].reverse().map(s => <option key={s.number} value={s.number}>{s.number} — {s.name} ({s.ayahCount} آية)</option>)}
-              </select></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-xs font-bold">من آية</label><input type="number" value={reviewForm.fromAyah} onChange={e => setReviewForm({ ...reviewForm, fromAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
-              <div><label className="text-xs font-bold">إلى آية</label><input type="number" value={reviewForm.toAyah} onChange={e => setReviewForm({ ...reviewForm, toAyah: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
+            <div>
+              <label className="text-xs font-bold">السور — انقر من نفس القائمة لاختيار أكثر من سورة</label>
+              <div className="relative mt-1">
+                <input value={reviewSearch} onChange={e=> setReviewSearch(e.target.value)} placeholder="ابحث بالاسم أو الرقم — انقر لإضافة" className="w-full px-3 py-2 rounded-xl border text-sm pr-9 bg-white" />
+                <span className="absolute right-3 top-2.5 text-gray-400">🔍</span>
+              </div>
+              <div className="mt-1 max-h-[120px] overflow-auto border rounded-xl bg-white">
+                {(reviewSearch.trim() ? SURAHS.filter(s=> s.name.includes(reviewSearch.trim()) || String(s.number).includes(reviewSearch.trim())) : SURAHS).slice(0,30).map(s=> {
+                  const isSelected = reviewSelected.some(x=> x.surahNumber===s.number)
+                  return (
+                    <label key={s.number} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-[#FAF9F4] ${isSelected ? "bg-[#E7EFE7]" : ""}`}>
+                      <input type="checkbox" checked={isSelected} onChange={()=> {
+                        if(isSelected) setReviewSelected(prev=> prev.filter(x=> x.surahNumber!==s.number))
+                        else setReviewSelected(prev=> [...prev, {surahNumber: s.number, fromAyah:1, toAyah: Math.min(10, s.ayahCount)}])
+                      }} className="accent-[#1F5E3A]" />
+                      <span className="text-xs flex-1">{s.number} — {s.name} ({s.ayahCount} آية)</span>
+                      {isSelected && <span className="text-[10px] text-[#1F5E3A] font-bold">✓</span>}
+                    </label>
+                  )
+                })}
+              </div>
+              {reviewSelected.length>0 && (
+                <div className="mt-2 space-y-2">
+                  <p className="text-[11px] font-bold text-[#1F5E3A]">المختارة ({reviewSelected.length}) — حدد الآيات:</p>
+                  {reviewSelected.map(sel=>{
+                    const surah = SURAHS.find(x=>x.number===sel.surahNumber)!
+                    const w = calcWajhDisplay(sel.surahNumber, sel.fromAyah, sel.toAyah)
+                    return (
+                      <div key={sel.surahNumber} className="bg-[#FAF9F4] rounded-xl border p-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs" style={{color:"#163F27"}}>{surah.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border text-[#1F5E3A]">{w}</span>
+                            <button onClick={()=> setReviewSelected(prev=> prev.filter(x=> x.surahNumber!==sel.surahNumber))} className="text-[11px] px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">حذف</button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-1.5">
+                          <div><label className="text-[11px] font-bold">من آية</label><div className="flex items-center gap-1 mt-1"><button type="button" onClick={()=> setReviewSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, fromAyah: Math.max(1, x.fromAyah-1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">−</button><input type="number" value={sel.fromAyah} onChange={e=> setReviewSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, fromAyah: Number(e.target.value)||1} : x))} className="flex-1 px-2 py-1.5 rounded-lg border text-center text-sm font-bold" /><button type="button" onClick={()=> setReviewSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, fromAyah: Math.min(surah.ayahCount, x.fromAyah+1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">+</button></div></div>
+                          <div><label className="text-[11px] font-bold">إلى آية</label><div className="flex items-center gap-1 mt-1"><button type="button" onClick={()=> setReviewSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, toAyah: Math.max(x.fromAyah, x.toAyah-1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">−</button><input type="number" value={sel.toAyah} onChange={e=> setReviewSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, toAyah: Number(e.target.value)||1} : x))} className="flex-1 px-2 py-1.5 rounded-lg border text-center text-sm font-bold" /><button type="button" onClick={()=> setReviewSelected(prev=> prev.map(x=> x.surahNumber===sel.surahNumber ? {...x, toAyah: Math.min(surah.ayahCount, x.toAyah+1)} : x))} className="w-7 h-7 rounded-lg bg-white border font-bold">+</button></div></div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div className="bg-[#E7EFE7] rounded-xl border border-[#A5D6A7] p-2 text-center">
+                    <span className="text-xs font-bold" style={{color:"#1F5E3A"}}>الإجمالي: {formatWajh(reviewSelected.reduce((a,s)=> a+calcWajhFraction(s.surahNumber,s.fromAyah,s.toAyah),0))} ({reviewSelected.length} سور)</span>
+                  </div>
+                </div>
+              )}
             </div>
             <div><label className="text-xs font-bold">التقدير</label>
               <select value={reviewForm.grade} onChange={e => setReviewForm({ ...reviewForm, grade: e.target.value as Grade })} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
@@ -2124,8 +2255,8 @@ function PlanModal({ plan, setPlan, onClose, onToast }: { plan: AcademicPlan; se
 
 function ParentTokenView({ student, circles, staff, attendance, plan }: { student: Student; circles: Circle[]; staff: Staff[]; attendance: AttendanceRecord[]; plan: AcademicPlan }) {
   const circleName = circles.find(c => c.id === student.circleId)?.name || "بدون حلقة"
-  const totalAyah = student.memorizationLog.reduce((a,b)=>a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
-  const totalReview = student.reviewLog.reduce((a,b)=>a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
+  const totalAyah = student.memorizationLog.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+  const totalReview = student.reviewLog.reduce((a,b)=>a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x=>x.grade==="ممتاز").length / student.memorizationLog.length * 100) : 0
 
   // آخر سجل  (حسب اختيار المستخدم)
@@ -2312,8 +2443,8 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
         {/* إحصائيات سريعة + زر الخطة السنوية بجانبها */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-          <MiniStat label="مقدار الحفظ" value={totalAyah + " وجه"} />
-          <MiniStat label="مقدار المراجعة" value={totalReview + " وجه"} />
+          <MiniStat label="مقدار الحفظ" value={formatWajh(totalAyah)} />
+          <MiniStat label="مقدار المراجعة" value={formatWajh(totalReview)} />
           <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
           <MiniStat label="عدد الملاحظات" value={String(student.notes.length)} />
           <button onClick={()=> setShowPlanPage(true)} className="bg-white rounded-xl border-2 border-[#1F5E3A]/20 hover:border-[#1F5E3A] hover:bg-[#E7EFE7]/50 p-3 text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
@@ -2355,7 +2486,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
+                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)})</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -2371,7 +2502,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
+                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)})</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -2431,7 +2562,7 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
   const [rows, setRows] = React.useState<Array<{id:string, surahNum:number, fromAyah:number, toAyah:number, search:string}>>([{id:uid(), surahNum:114, fromAyah:1, toAyah:6, search:""}])
 
   const dayName = getDayNameFromISO(date)
-  const totalWajh = rows.reduce((a,r)=> a + calcWajh(r.surahNum, r.fromAyah, r.toAyah), 0)
+  const totalWajh = rows.reduce((a,r)=> a + calcWajhFraction(r.surahNum, r.fromAyah, r.toAyah), 0)
 
   const updateRow = (id:string, patch: Partial<{surahNum:number, fromAyah:number, toAyah:number, search:string}>) => {
     setRows(prev=> prev.map(r=> r.id===id ? {...r, ...patch} : r))
@@ -2456,7 +2587,7 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
     const newReviews: ReviewEntry[] = []
     for(const r of rows){
       const surah = SURAHS.find(x=>x.number===r.surahNum)!
-      const w = calcWajh(r.surahNum, r.fromAyah, r.toAyah)
+      const w = calcWajhFraction(r.surahNum, r.fromAyah, r.toAyah)
       if(tab==="mem"){
         newMems.push({ id: uid(), date: effDate, surahNumber: surah.number, surahName: surah.name, fromAyah: r.fromAyah, toAyah: r.toAyah, ayahCount: r.toAyah - r.fromAyah + 1, grade: gradeLabel, teacherId: currentUserId, notes: notes || undefined })
       } else {
@@ -2475,9 +2606,9 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
   }
 
   const periodStats = React.useMemo(()=>{
-    const totalMem = student.memorizationLog.reduce((a,b)=> a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
-    const totalKubra = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
-    const totalSughra = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+calcWajh(b.surahNumber,b.fromAyah,b.toAyah),0)
+    const totalMem = student.memorizationLog.reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+    const totalKubra = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+    const totalSughra = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
     const requiredMem = student.targetFacesWeekly ? student.targetFacesWeekly * 4 : 0
     const requiredKubra = student.dailyMinKubraFaces ? student.dailyMinKubraFaces * 28 : 0
     return { totalMem, totalKubra, totalSughra, requiredMem, requiredKubra }
@@ -2532,7 +2663,7 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
           {rows.map((r, idx)=>{
             const surah = SURAHS.find(s=>s.number===r.surahNum)!
             const filtered = r.search.trim() ? SURAHS.filter(s=> s.name.includes(r.search.trim()) || String(s.number).includes(r.search.trim())) : SURAHS
-            const w = calcWajh(r.surahNum, r.fromAyah, r.toAyah)
+            const w = calcWajhFraction(r.surahNum, r.fromAyah, r.toAyah)
             return (
               <div key={r.id} className="bg-[#FAF9F4] rounded-xl border p-3 space-y-2">
                 <div className="flex items-center justify-between">
@@ -2618,8 +2749,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const isValidWa = !!waDigits && waDigits.length === 12 && /^9665\d{8}$/.test(waDigits)
   const waLink = isValidWa ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waText)}` : `https://wa.me/?text=${encodeURIComponent(waText)}`
   const waGeneral = `https://wa.me/?text=${encodeURIComponent(waText)}`
-  const totalAyah = student.memorizationLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
-  const totalReview = student.reviewLog.reduce((a, b) => a + calcWajh(b.surahNumber, b.fromAyah, b.toAyah), 0)
+  const totalAyah = student.memorizationLog.reduce((a, b) => a + calcWajhFraction(b.surahNumber, b.fromAyah, b.toAyah), 0)
+  const totalReview = student.reviewLog.reduce((a, b) => a + calcWajhFraction(b.surahNumber, b.fromAyah, b.toAyah), 0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x => x.grade === "ممتاز").length / student.memorizationLog.length * 100) : 0
   // ===== المطلوب غداً — آخر تسجيل لكل نوع =====
   const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
@@ -2693,14 +2824,27 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <MiniStat label="مقدار الحفظ" value={totalAyah + " وجه"} />
-          <MiniStat label="مقدار المراجعة" value={totalReview + " وجه"} />
+          <MiniStat label="مقدار الحفظ" value={formatWajh(totalAyah)} />
+          <MiniStat label="مقدار المراجعة" value={formatWajh(totalReview)} />
           <MiniStat label="نسبة الامتياز" value={excellenceRate + "%"} />
           <MiniStat label="عدد الأخطاء" value={String(student.errorsLog.length)} />
         </div>
 
-        {/* ===== الإدخال السريع — المواصفة الجديدة (3 تبويبات بضغطات فقط) ===== */}
-        <QuickTrackingEntry student={student} currentUserId={currentUserId} plan={plan} readOnly={readOnly} onUpdate={onUpdate} onToast={(m)=>{}} />
+        {/* إحصائيات أوجه دقيقة — تحسب من الآيات ثم تحول لوجه مع كسور ربع/نصف/ثلاثة أرباع */}
+        {(() => {
+          const totalMemFrac = student.memorizationLog.reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+          const totalKubraFrac = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+          const totalSughraFrac = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+          const requiredMem = student.targetFacesWeekly ? student.targetFacesWeekly * 4 : 0
+          const requiredKubra = student.dailyMinKubraFaces ? student.dailyMinKubraFaces * 28 : 0
+          return (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{formatWajh(totalMemFrac)}</p><p className="text-[10px] text-gray-400">مطلوب: {requiredMem||"—"} {requiredMem? (totalMemFrac>=requiredMem ? "✓ تم" : "○ لم يتم"):""}</p></div>
+              <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{formatWajh(totalKubraFrac)}</p><p className="text-[10px] text-[#2E7D32]">مطلوب: {requiredKubra||"—"}</p></div>
+              <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{formatWajh(totalSughraFrac)}</p><p className="text-[10px] text-[#1565C0]">آخر جلسة: {student.reviewLog.find(x=>x.reviewType==="small")?.date || "—"}</p></div>
+            </div>
+          )
+        })()}
 
         {/* ===== المطلوب غداً — آخر تسجيل لكل نوع في مكان واحد (بدون اسم المعلم) ===== */}
         <div className="space-y-3">
@@ -2853,7 +2997,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
+                            <p className="font-bold text-xs">حفظ — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)})</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -2873,7 +3017,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                         <div className="flex items-center gap-2.5">
                           <span className="w-8 h-8 rounded-lg flex items-center justify-center text-xs shrink-0" style={{background:"#E7EFE7"}}></span>
                           <div>
-                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</span></p>
+                            <p className="font-bold text-xs">{isSmall ? "مراجعة صغرى" : "مراجعة كبرى"} — سورة {e.surahName} <span className="font-normal text-gray-500">({e.fromAyah}-{e.toAyah} • {calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)})</span></p>
                             <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
                           </div>
                         </div>
@@ -3020,7 +3164,7 @@ function LogRow({ e, staff, onDelete, hideDelete }: { e: ReviewEntry; staff: Sta
   return (
     <div className="flex items-center justify-between p-2.5 rounded-xl border bg-white">
       <div>
-        <p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({calcWajh(e.surahNumber, e.fromAyah, e.toAyah)} وجه)</p>
+        <p className="font-bold text-xs">سورة {e.surahName} {e.fromAyah}-{e.toAyah} ({calcWajhDisplay(e.surahNumber, e.fromAyah, e.toAyah)})</p>
         <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
       </div>
       <div className="flex items-center gap-1.5">
