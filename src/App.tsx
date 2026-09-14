@@ -2127,20 +2127,7 @@ export default function App() {
           <div className="flex gap-2 mt-4"><button onClick={handleAddReview} className="flex-1 py-2.5 rounded-xl bg-[#1F5E3A] text-white font-bold text-sm">حفظ المراجعة</button><button onClick={() => setShowReviewModal(null)} className="flex-1 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">إلغاء</button></div>
         </Modal>
       )}
-
-      {showErrorModal && selectedStudent && (
-        <Modal title="تسجيل خطأ" onClose={() => setShowErrorModal(false)}>
-          <div className="grid gap-3">
-            <div><label className="text-xs font-bold">التاريخ</label><input type="date" value={errorForm.date} onChange={e => setErrorForm({ ...errorForm, date: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
-            <div><label className="text-xs font-bold">نوع الخطأ</label>
-              <select value={errorForm.type} onChange={e => setErrorForm({ ...errorForm, type: e.target.value as ErrorType })} className="w-full mt-1 px-3 py-2.5 rounded-xl border bg-white text-sm">
-                {ERROR_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select></div>
-            <div><label className="text-xs font-bold">الوصف</label><textarea value={errorForm.description} onChange={e => setErrorForm({ ...errorForm, description: e.target.value })} rows={3} placeholder="اكتب تفاصيل الخطأ..." className="w-full mt-1 px-3 py-2 rounded-xl border text-sm" /></div>
-          </div>
-          <div className="flex gap-2 mt-4"><button onClick={handleAddError} className="flex-1 py-2.5 rounded-xl bg-[#B3492C] text-white font-bold text-sm">حفظ الخطأ</button><button onClick={() => setShowErrorModal(false)} className="flex-1 py-2.5 rounded-xl bg-gray-100 font-bold text-sm">إلغاء</button></div>
-        </Modal>
-      )}
+      {/* تم حذف مودال تسجيل الخطأ بناءً على طلب المستخدم */}
 
       {showNoteModal && selectedStudent && (
         <Modal title="إضافة ملاحظة" onClose={() => setShowNoteModal(false)}>
@@ -2543,7 +2530,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0" style={{background:"#1F5E3A"}}>{studentLive.name.trim().charAt(0)}</div>
           <div className="flex-1 min-w-0">
             <h3 className="font-black text-lg" style={{color:"#163F27"}}>{studentLive.name}</h3>
-            <p className="text-xs text-gray-500 mt-1 truncate">{circleName}{(studentLive as any).schoolGrade ? " • " + (studentLive as any).schoolGrade : ""} • حفظ: {studentLive.memorizationLog.length} • مراجعة: {studentLive.reviewLog.length} • أخطاء: {studentLive.errorsLog.length}</p>
+            <p className="text-xs text-gray-500 mt-1 truncate">{circleName}{(studentLive as any).schoolGrade ? " • " + (studentLive as any).schoolGrade : ""} • حفظ: {studentLive.memorizationLog.length} • مراجعة: {studentLive.reviewLog.length}</p>
           </div>
           <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
             <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">متابعة ولي الأمر</span>
@@ -2720,19 +2707,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border p-4">
-          <h4 className="font-bold text-xs mb-3">الأخطاء ({studentLive.errorsLog.length})</h4>
-          {studentLive.errorsLog.length===0 ? <p className="text-xs text-emerald-700 text-center py-2 bg-emerald-50 border border-emerald-200 rounded-xl">لا يوجد أخطاء مسجلة، ما شاء الله!</p> : (
-            <div className="space-y-2">
-              {studentLive.errorsLog.map(e=> (
-                <div key={e.id} className="p-3 rounded-xl border bg-red-50/40 border-red-200">
-                  <p className="font-bold text-xs text-red-800">{e.type} — <span className="font-normal text-gray-700">{e.description}</span></p>
-                  <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* تم حذف قسم الأخطاء بالكامل بناءً على طلب المستخدم */}
         <div className="bg-white rounded-2xl border p-4">
           <h4 className="font-bold text-xs mb-3">الملاحظات ({studentLive.notes.length})</h4>
           {studentLive.notes.length===0 ? <p className="text-xs text-gray-400 text-center py-2">لا توجد ملاحظات</p> : (
@@ -3255,22 +3230,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             {filteredPrev.length>0 && <p className="text-center text-[11px] text-gray-400 mt-3">💡 هذا هو سجلك السابق — المطلوب الحالي معروض في الأعلى</p>}
           </div>
         </div>
-
-        {/* Errors */}
-        <Section title="الأخطاء" count={student.errorsLog.length} emptyText="لا يوجد أخطاء، ما شاء الله!" actionLabel="+ تسجيل خطأ" onAction={onAddError} hideAction={readOnly}>
-          <div className="space-y-2">
-            {student.errorsLog.map(e => (
-              <div key={e.id} className="p-3 rounded-xl border bg-red-50/50 border-red-200 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-xs text-red-800">{e.type} — <span className="font-normal text-gray-700">{e.description}</span></p>
-                  <p className="text-[11px] text-gray-500">{fmtBoth(e.date)}</p>
-                </div>
-                {!readOnly && <button onClick={() => onUpdate({ ...student, errorsLog: student.errorsLog.filter(x => x.id !== e.id) })} className="px-2 py-1 rounded-full bg-white border text-xs">حذف</button>}
-              </div>
-            ))}
-            {student.errorsLog.length === 0 && <p className="text-xs text-emerald-700 text-center py-2 bg-emerald-50 border border-emerald-200 rounded-xl">لا يوجد أخطاء مسجلة، ما شاء الله تبارك الله!</p>}
-          </div>
-        </Section>
+        {/* تم حذف قسم الأخطاء بالكامل بناءً على طلب المستخدم */}
 
         {/* Notes */}
         <Section title="الملاحظات والتوجيهات" count={student.notes.length} emptyText="لا توجد ملاحظات" actionLabel="إضافة ملاحظة" onAction={onAddNote} hideAction={readOnly}>
