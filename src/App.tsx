@@ -2905,9 +2905,9 @@ function QuickTrackingEntry({ student, currentUserId, plan, readOnly, onUpdate, 
         {!readOnly && <p className="text-center text-[11px] text-gray-400">يُحفظ تلقائياً في المتصفح والسحابة — أسهل من الكتابة على الورق • الأوجه محسوبة بدقة من صفحات المصحف</p>}
       </div>
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{periodStats.totalMem} وجه</p><p className="text-[10px] text-gray-400">مطلوب: {periodStats.requiredMem||"—"} {periodStats.requiredMem? (periodStats.totalMem>=periodStats.requiredMem ? "✓ تم" : "○ لم يتم"):""}</p></div>
-        <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{periodStats.totalKubra} وجه</p><p className="text-[10px] text-[#2E7D32]">مطلوب: {periodStats.requiredKubra||"—"}</p></div>
-        <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{periodStats.totalSughra} وجه</p><p className="text-[10px] text-[#1565C0]">آخر جلسة: {student.reviewLog.find(x=>x.reviewType==="small")?.date || "—"}</p></div>
+        <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{periodStats.totalMem} وجه</p></div>
+        <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{periodStats.totalKubra} وجه</p></div>
+        <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{periodStats.totalSughra} وجه</p></div>
       </div>
     </div>
   )
@@ -3009,7 +3009,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
             <a href={waGeneral} target="_blank" rel="noreferrer" className="flex-1 text-center py-2.5 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white text-xs font-bold">مشاركة عامة</a>
           </div>
           {!isValidWa && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2 leading-5">⚠️ رقم جوال ولي الأمر غير صحيح أو غير مدخل — سيُفتح واتساب للمشاركة العامة. أدخل رقم 05XXXXXXXX في تعديل الطالب ليُرسل مباشرة لولي الأمر.</p>}
-          {(() => { const _visitedToday = (student.visitLog || []).some(v => v.date === todayISO()); return (<div className="mt-3 flex flex-col gap-1"><span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border w-fit ${ _visitedToday ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}><span className={`w-1.5 h-1.5 rounded-full ${ _visitedToday ? "bg-emerald-500" : "bg-amber-500"}`}></span>{_visitedToday ? "✓ زار رابط المتابعة اليوم" : "○ لم يزر رابط المتابعة اليوم"}</span><span className="text-[10px] text-gray-400">يتجدد تلقائياً كل يوم — يظهر "زار" فقط إذا دخل ولي الأمر رابط المتابعة خلال اليوم الحالي</span></div>)})()}
+          {(() => { const _visitedToday = (student.visitLog || []).some(v => v.date === todayISO()); return (<div className="mt-3 flex flex-col gap-1"><span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border w-fit ${ _visitedToday ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}><span className={`w-1.5 h-1.5 rounded-full ${ _visitedToday ? "bg-emerald-500" : "bg-amber-500"}`}></span>{_visitedToday ? "✓ زار رابط المتابعة اليوم" : "○ لم يزر رابط المتابعة اليوم"}</span></div>)})()}
         </div>
         {/* تم حذف المربعات الأربعة (مقدار الحفظ/المراجعة/نسبة الامتياز/عدد الأخطاء) بناءً على طلب المستخدم */}
 
@@ -3022,9 +3022,9 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           const requiredKubra = student.dailyMinKubraFaces ? student.dailyMinKubraFaces * 28 : 0
           return (
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{formatWajh(totalMemFrac)}</p><p className="text-[10px] text-gray-400">مطلوب: {requiredMem||"—"} {requiredMem? (totalMemFrac>=requiredMem ? "✓ تم" : "○ لم يتم"):""}</p></div>
-              <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{formatWajh(totalKubraFrac)}</p><p className="text-[10px] text-[#2E7D32]">مطلوب: {requiredKubra||"—"}</p></div>
-              <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{formatWajh(totalSughraFrac)}</p><p className="text-[10px] text-[#1565C0]">آخر جلسة: {student.reviewLog.find(x=>x.reviewType==="small")?.date || "—"}</p></div>
+              <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{formatWajh(totalMemFrac)}</p></div>
+              <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{formatWajh(totalKubraFrac)}</p></div>
+              <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{formatWajh(totalSughraFrac)}</p></div>
             </div>
           )
         })()}
