@@ -2459,7 +2459,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
   const latestSmall = latestSmalls[0] || null
   const latestLarge = latestLarges[0] || null
 
-  const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
+  const [historyFilter, setHistoryFilter] = React.useState<"mem"|"small"|"large">("mem")
   const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
   const [newGrade, setNewGrade] = React.useState<Grade>("ممتاز")
   const [editingEntry, setEditingEntry] = React.useState<{id:string; type:"mem"|"small"|"large"} | null>(null)
@@ -2481,7 +2481,8 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
 
   const filteredPrev = React.useMemo(() => {
     if (historyFilter === "mem") return previousCombined.filter(x=> x.type==="mem")
-    if (historyFilter === "review") return previousCombined.filter(x=> x.type!=="mem")
+    if (historyFilter === "large") return previousCombined.filter(x=> x.type==="large")
+    if (historyFilter === "small") return previousCombined.filter(x=> x.type==="small")
     return previousCombined
   }, [previousCombined, historyFilter])
 
@@ -2649,13 +2650,11 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           <div className="px-4 py-3 border-b bg-[#FAF9F4]/70 flex flex-wrap items-center justify-between gap-3">
             <h4 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>
               📂 السجل السابق
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border text-gray-600">{previousCombined.length} سجل</span>
-              <span className="hidden sm:inline text-[11px] font-normal text-gray-400">— ما عدا المطلوب المعروض أعلاه</span>
             </h4>
             <div className="flex gap-1 p-1 rounded-full bg-gray-100 border">
-              <button onClick={()=> setHistoryFilter("all")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="all" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>الكل</button>
-              <button onClick={()=> setHistoryFilter("mem")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="mem" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>حفظ فقط</button>
-              <button onClick={()=> setHistoryFilter("review")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="review" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>مراجعة فقط</button>
+              <button onClick={()=> setHistoryFilter("mem")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="mem" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>الحفظ</button>
+              <button onClick={()=> setHistoryFilter("large")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="large" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>كبرى</button>
+              <button onClick={()=> setHistoryFilter("small")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="small" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>صغرى</button>
             </div>
           </div>
           <div className="p-4">
@@ -2703,7 +2702,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
                 })}
               </div>
             )}
-            {filteredPrev.length>0 && <p className="text-center text-[11px] text-gray-400 mt-3">💡 هذا هو سجلك السابق — المطلوب الحالي معروض في الأعلى بشكل منفصل</p>}
+
           </div>
         </div>
 
@@ -2932,7 +2931,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   const totalReview = student.reviewLog.reduce((a, b) => a + calcWajhFraction(b.surahNumber, b.fromAyah, b.toAyah), 0)
   const excellenceRate = student.memorizationLog.length ? Math.round(student.memorizationLog.filter(x => x.grade === "ممتاز").length / student.memorizationLog.length * 100) : 0
   // ===== المطلوب غداً — آخر تسجيل لكل نوع =====
-  const [historyFilter, setHistoryFilter] = React.useState<"all"|"mem"|"review">("all")
+  const [historyFilter, setHistoryFilter] = React.useState<"mem"|"small"|"large">("mem")
   const [editingGrade, setEditingGrade] = React.useState<{ id: string; type: "mem"|"small"|"large"; current: Grade } | null>(null)
   const [newGrade, setNewGrade] = React.useState<Grade>("ممتاز")
   const [editingEntry, setEditingEntry] = React.useState<{id:string; type:"mem"|"small"|"large"} | null>(null)
@@ -2979,7 +2978,8 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
   }, [student, latestMemDate, latestSmallDate, latestLargeDate])
   const filteredPrev = React.useMemo(() => {
     if (historyFilter === "mem") return previousCombined.filter(x=> x.type==="mem")
-    if (historyFilter === "review") return previousCombined.filter(x=> x.type!=="mem")
+    if (historyFilter === "large") return previousCombined.filter(x=> x.type==="large")
+    if (historyFilter === "small") return previousCombined.filter(x=> x.type==="small")
     return previousCombined
   }, [previousCombined, historyFilter])
   const memMap = React.useMemo(()=> new Map(student.memorizationLog.map(e=>[e.id, e] as const)), [student])
@@ -3165,13 +3165,11 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           <div className="px-4 py-3 border-b bg-[#FAF9F4]/70 flex flex-wrap items-center justify-between gap-3">
             <h4 className="font-black text-sm flex items-center gap-2" style={{color:"#163F27"}}>
               📂 السجل السابق
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border text-gray-600">{previousCombined.length} سجل</span>
-              <span className="hidden sm:inline text-[11px] font-normal text-gray-400">— ما عدا المطلوب أعلاه</span>
             </h4>
             <div className="flex gap-1 p-1 rounded-full bg-gray-100 border">
-              <button onClick={()=> setHistoryFilter("all")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="all" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>الكل</button>
-              <button onClick={()=> setHistoryFilter("mem")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="mem" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>حفظ فقط</button>
-              <button onClick={()=> setHistoryFilter("review")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="review" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>مراجعة فقط</button>
+              <button onClick={()=> setHistoryFilter("mem")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="mem" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>الحفظ</button>
+              <button onClick={()=> setHistoryFilter("large")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="large" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>كبرى</button>
+              <button onClick={()=> setHistoryFilter("small")} className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${historyFilter==="small" ? "bg-[#1F5E3A] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>صغرى</button>
             </div>
           </div>
           <div className="p-4">
@@ -3227,7 +3225,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
                 })}
               </div>
             )}
-            {filteredPrev.length>0 && <p className="text-center text-[11px] text-gray-400 mt-3">💡 هذا هو سجلك السابق — المطلوب الحالي معروض في الأعلى</p>}
+
           </div>
         </div>
         {/* تم حذف قسم الأخطاء بالكامل بناءً على طلب المستخدم */}
