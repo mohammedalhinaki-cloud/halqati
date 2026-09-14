@@ -3014,20 +3014,6 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
         {/* تم حذف المربعات الأربعة (مقدار الحفظ/المراجعة/نسبة الامتياز/عدد الأخطاء) بناءً على طلب المستخدم */}
 
         {/* إحصائيات أوجه دقيقة — تحسب من الآيات ثم تحول لوجه مع كسور ربع/نصف/ثلاثة أرباع */}
-        {(() => {
-          const totalMemFrac = student.memorizationLog.reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
-          const totalKubraFrac = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
-          const totalSughraFrac = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
-          const requiredMem = student.targetFacesWeekly ? student.targetFacesWeekly * 4 : 0
-          const requiredKubra = student.dailyMinKubraFaces ? student.dailyMinKubraFaces * 28 : 0
-          return (
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{formatWajh(totalMemFrac)}</p></div>
-              <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{formatWajh(totalKubraFrac)}</p></div>
-              <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{formatWajh(totalSughraFrac)}</p></div>
-            </div>
-          )
-        })()}
 
         {/* ===== المطلوب غداً — آخر تسجيل لكل نوع في مكان واحد (بدون اسم المعلم) ===== */}
         <div className="space-y-3">
@@ -3159,6 +3145,22 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
 
 
         </div>
+
+
+        {(() => {
+          const totalMemFrac = student.memorizationLog.reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+          const totalKubraFrac = student.reviewLog.filter(x=>x.reviewType==="large").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+          const totalSughraFrac = student.reviewLog.filter(x=>x.reviewType==="small").reduce((a,b)=> a+calcWajhFraction(b.surahNumber,b.fromAyah,b.toAyah),0)
+          const requiredMem = student.targetFacesWeekly ? student.targetFacesWeekly * 4 : 0
+          const requiredKubra = student.dailyMinKubraFaces ? student.dailyMinKubraFaces * 28 : 0
+          return (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-[#FAF9F4] rounded-xl p-2.5 border text-center"><p className="text-[11px] font-bold text-gray-500">إجمالي الحفظ</p><p className="font-black text-sm" style={{color:"#1F5E3A"}}>{formatWajh(totalMemFrac)}</p></div>
+              <div className="bg-[#E8F5E9] rounded-xl p-2.5 border border-[#C8E6C9] text-center"><p className="text-[11px] font-bold text-[#1B5E20]">إجمالي الكبرى</p><p className="font-black text-sm" style={{color:"#1B5E20"}}>{formatWajh(totalKubraFrac)}</p></div>
+              <div className="bg-[#E3F2FD] rounded-xl p-2.5 border border-[#90CAF9] text-center"><p className="text-[11px] font-bold text-[#0D47A1]">إجمالي الصغرى</p><p className="font-black text-sm" style={{color:"#0D47A1"}}>{formatWajh(totalSughraFrac)}</p></div>
+            </div>
+          )
+        })()}
 
         {/* ===== السجل السابق — كل القديم في مكان واحد (بدون اسم المعلم) ===== */}
         <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
