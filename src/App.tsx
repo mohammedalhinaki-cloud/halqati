@@ -36,6 +36,7 @@ interface Student {
   dailyMinFaces?: number;
   dailyMinKubraFaces?: number;
   studyLevel?: string;
+  schoolGrade?: string;
   internalTest1?: number[];
   internalTest2?: number[];
 }
@@ -183,6 +184,7 @@ CREATE TABLE IF NOT EXISTS halqati_students (
     phone TEXT,
     circle_id TEXT REFERENCES halqati_circles(id) ON DELETE SET NULL,
     access_token TEXT UNIQUE NOT NULL,
+    school_grade TEXT,
     memorization_log JSONB DEFAULT '[]'::jsonb,
     review_log JSONB DEFAULT '[]'::jsonb,
     errors_log JSONB DEFAULT '[]'::jsonb,
@@ -190,6 +192,7 @@ CREATE TABLE IF NOT EXISTS halqati_students (
     visit_log JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE halqati_students ADD COLUMN IF NOT EXISTS school_grade TEXT;
 CREATE TABLE IF NOT EXISTS halqati_settings (
     id TEXT PRIMARY KEY,
     data JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -250,6 +253,7 @@ function saveSupabaseConfig(url: string, key: string) {
 }
 
 // ===================== Helpers =====================
+const SCHOOL_GRADES = ["الأول","الثاني","الثالث","الرابع","الخامس","السادس","متوسط","ثانوي"] as const
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 const todayISO = () => new Date().toISOString().slice(0, 10)
 const fmtDate = (iso: string) => {
@@ -593,7 +597,7 @@ export default function App() {
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
 
   const [showStudentModal, setShowStudentModal] = useState(false)
-  const [studentForm, setStudentForm] = useState<{ name: string; phone: string; circleId: string }>({ name: "", phone: "", circleId: "" })
+  const [studentForm, setStudentForm] = useState<{ name: string; phone: string; circleId: string; schoolGrade: string }>({ name: "", phone: "", circleId: "", schoolGrade: "" })
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
@@ -631,12 +635,37 @@ export default function App() {
       const att = localStorage.getItem("halqati_attendance")
       if (c) setCircles(JSON.parse(c))
       if (s) setStaff(JSON.parse(s))
-      if (st) setStudents(JSON.parse(st))
+      if (st) {
+        const parsed: any[] = JSON.parse(st)
+        // دمج درجات الصف من التخزين المحلي المنفصل (للمزامنة عبر student_grades)
+        try{
+          const grades = JSON.parse(localStorage.getItem("halqati_student_grades")||"{}")
+          parsed.forEach((stu:any)=>{ if(grades[stu.id] && !stu.schoolGrade) stu.schoolGrade = grades[stu.id] })
+        }catch{}
+        setStudents(parsed)
+      }
       if (p) setPlan(JSON.parse(p))
       if (att) try{ setAttendance(JSON.parse(att)) }catch{}
       const ann = localStorage.getItem("halqati_announcements")
       if (ann) try{ setAnnouncements(JSON.parse(ann)) }catch{}
     } catch { }
+    // جلب درجات الصفوف من السحابة ودمجها
+    try{
+      const sbGrades = getSupabase()
+      if(sbGrades){
+        sbGrades.from("halqati_settings").select("data").eq("id","student_grades").maybeSingle().then(({data})=>{
+          const map = (data?.data as Record<string,string>) || {}
+          if(Object.keys(map).length){
+            try{ localStorage.setItem("halqati_student_grades", JSON.stringify(map)) }catch{}
+            setStudents(prev=> prev.map(s=> {
+              const g = map[s.id]
+              if(g && !(s as any).schoolGrade) return { ...s, schoolGrade: g } as any
+              return s
+            }))
+          }
+        })
+      }
+    }catch{}
     // check cloud connection
     const sb = getSupabase()
     if (sb) {
@@ -718,9 +747,10 @@ export default function App() {
     sb.from("halqati_students").select("*").eq("access_token", t).maybeSingle().then(({ data, error }) => {
       setParentCloudLoading(false)
       if (data && !error) {
+        const gradesLocal = (()=>{ try{ return JSON.parse(localStorage.getItem("halqati_student_grades")||"{}") }catch{ return {} } })()
         const s: Student = {
           id: data.id, name: data.name, phone: data.phone || "", circleId: data.circle_id,
-          accessToken: data.access_token, memorizationLog: data.memorization_log || [], reviewLog: data.review_log || [], errorsLog: data.errors_log || [], notes: data.notes || [], visitLog: data.visit_log || []
+          accessToken: data.access_token, schoolGrade: (data as any).school_grade || gradesLocal[data.id] || undefined, memorizationLog: data.memorization_log || [], reviewLog: data.review_log || [], errorsLog: data.errors_log || [], notes: data.notes || [], visitLog: data.visit_log || []
         }
         setParentCloudStudent(s)
         // خزّن محلياً للزيارات القادمة
@@ -863,10 +893,23 @@ export default function App() {
     try {
       if (circles.length) await sb.from("halqati_circles").upsert(circles.map(c => ({ id: c.id, name: c.name })), { onConflict: "id" })
       if (staff.length) await sb.from("halqati_staff").upsert(staff.map(s => ({ id: s.id, name: s.name, phone: s.phone, role: s.role, circle_id: s.circleId })), { onConflict: "id" })
-      if (students.length) await sb.from("halqati_students").upsert(students.map(s => ({
-        id: s.id, name: s.name, phone: s.phone, circle_id: s.circleId, access_token: s.accessToken,
-        memorization_log: s.memorizationLog, review_log: s.reviewLog, errors_log: s.errorsLog, notes: s.notes, visit_log: s.visitLog
-      })), { onConflict: "id" })
+      if (students.length) {
+        try{
+          await sb.from("halqati_students").upsert(students.map(s => ({
+            id: s.id, name: s.name, phone: s.phone, circle_id: s.circleId, access_token: s.accessToken, school_grade: (s as any).schoolGrade || null,
+            memorization_log: s.memorizationLog, review_log: s.reviewLog, errors_log: s.errorsLog, notes: s.notes, visit_log: s.visitLog
+          })), { onConflict: "id" })
+        } catch(e:any){ if(String(e.message||"").includes("school_grade")) await sb.from("halqati_students").upsert(students.map(s => ({
+            id: s.id, name: s.name, phone: s.phone, circle_id: s.circleId, access_token: s.accessToken,
+            memorization_log: s.memorizationLog, review_log: s.reviewLog, errors_log: s.errorsLog, notes: s.notes, visit_log: s.visitLog
+          })), { onConflict: "id" }); else throw e }
+      }
+      // مزامنة درجات الصفوف عبر الإعدادات (احتياطي حتى لو لم يوجد العمود)
+      try{
+        const gradesMap: Record<string,string> = {}
+        students.forEach(s=>{ const g=(s as any).schoolGrade?.trim(); if(g) gradesMap[s.id]=g })
+        await sb.from("halqati_settings").upsert({ id:"student_grades", data: gradesMap, updated_at: new Date().toISOString() }, {onConflict:"id"})
+      }catch{}
       await sb.from("halqati_settings").upsert({ id: "academic_plan", data: plan, updated_at: new Date().toISOString() }, { onConflict: "id" })
       // Attendance -> halqati_attendance table + backup in settings
       if (attendance.length) {
@@ -896,9 +939,13 @@ export default function App() {
       if (stRes.error) throw stRes.error
       const newCircles: Circle[] = (cRes.data || []).map((x: any) => ({ id: x.id, name: x.name }))
       const newStaff: Staff[] = (sRes.data || []).map((x: any) => ({ id: x.id, name: x.name, phone: x.phone, role: x.role, circleId: x.circle_id }))
+      const gradesRes = await sb.from("halqati_settings").select("data").eq("id","student_grades").maybeSingle()
+      const gradesMap = (gradesRes.data?.data as Record<string,string>) || {}
+      try{ localStorage.setItem("halqati_student_grades", JSON.stringify(gradesMap)) }catch{}
       const newStudents: Student[] = (stRes.data || []).map((x: any) => ({
         id: x.id, name: x.name, phone: x.phone || "", circleId: x.circle_id,
-        accessToken: x.access_token, memorizationLog: x.memorization_log || [], reviewLog: x.review_log || [], errorsLog: x.errors_log || [], notes: x.notes || [], visitLog: x.visit_log || []
+        accessToken: x.access_token, schoolGrade: x.school_grade || gradesMap[x.id] || (JSON.parse(localStorage.getItem("halqati_student_grades")||"{}")[x.id]||"") || undefined,
+        memorizationLog: x.memorization_log || [], reviewLog: x.review_log || [], errorsLog: x.errors_log || [], notes: x.notes || [], visitLog: x.visit_log || []
       }))
       setCircles(newCircles)
       setStaff(newStaff)
@@ -953,7 +1000,7 @@ export default function App() {
       const names = ["عبدالله", "عبدالرحمن", "محمد", "يوسف", "إبراهيم", "سامي", "فيصل", "عمر"]
       return {
         id: uid(), name: names[i] + " الطالب", phone: "05" + (10000000 + i * 12345).toString().slice(-8),
-        circleId: [c1.id, c2.id, c3.id][i % 3], accessToken: uid() + uid().slice(0, 4),
+        circleId: [c1.id, c2.id, c3.id][i % 3], schoolGrade: (["الأول","الثاني","الثالث","الرابع","الخامس","السادس","متوسط","ثانوي"] as const)[i % 8], accessToken: uid() + uid().slice(0, 4),
         memorizationLog: [
           { id: uid(), date: todayISO(), surahNumber: 2, surahName: "البقرة", fromAyah: 1, toAyah: 5, ayahCount: 5, grade: (["ممتاز", "جيد", "يحتاج إعادة"][i % 3] as Grade), teacherId: t1.id },
           { id: uid(), date: "2026-09-10", surahNumber: 1, surahName: "الفاتحة", fromAyah: 1, toAyah: 7, ayahCount: 7, grade: "ممتاز" as Grade, teacherId: t1.id },
@@ -1045,26 +1092,52 @@ export default function App() {
     if (rawPhone && !isValidSaudiMobile(rawPhone)) { showToast("رقم الجوال غير صحيح — أدخل 05XXXXXXXX أو 9665XXXXXXXX"); return }
     const normalizedPhone = rawPhone ? normalizePhoneForStorage(rawPhone) : ""
     const effectiveCircleId = currentUser?.role === "teacher" ? (currentUser.circleId || studentForm.circleId || null) : (studentForm.circleId || null)
+    const gradeVal = studentForm.schoolGrade?.trim() || undefined
     if (editingStudentId) {
-      setStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, name: studentForm.name.trim(), phone: normalizedPhone, circleId: effectiveCircleId } : s))
+      setStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, name: studentForm.name.trim(), phone: normalizedPhone, circleId: effectiveCircleId, schoolGrade: gradeVal } : s))
       const sb = getSupabase(); if (sb) {
         const st = students.find(x => x.id === editingStudentId)!;
-        sb.from("halqati_students").upsert({ id: st.id, name: studentForm.name.trim(), phone: normalizedPhone, circle_id: effectiveCircleId, access_token: st.accessToken, memorization_log: st.memorizationLog, review_log: st.reviewLog, errors_log: st.errorsLog, notes: st.notes, visit_log: st.visitLog }, { onConflict: "id" }).then()
+        // حاول حفظ العمود الجديد إن وجد، وإلا تجاهل الخطأ — الدرجة تُحفظ أيضاً في halqati_settings كنسخة احتياطية
+        sb.from("halqati_students").upsert({ id: st.id, name: studentForm.name.trim(), phone: normalizedPhone, circle_id: effectiveCircleId, access_token: st.accessToken, school_grade: gradeVal || null, memorization_log: st.memorizationLog, review_log: st.reviewLog, errors_log: st.errorsLog, notes: st.notes, visit_log: st.visitLog }, { onConflict: "id" }).then(({error})=>{ if(error && String(error.message).includes("school_grade")) sb.from("halqati_students").upsert({ id: st.id, name: studentForm.name.trim(), phone: normalizedPhone, circle_id: effectiveCircleId, access_token: st.accessToken, memorization_log: st.memorizationLog, review_log: st.reviewLog, errors_log: st.errorsLog, notes: st.notes, visit_log: st.visitLog }, { onConflict: "id" }).then() })
+        // حفظ الدرجة في الإعدادات للمزامنة حتى بدون عمود
+        sb.from("halqati_settings").select("data").eq("id","student_grades").maybeSingle().then(({data})=>{
+          const map = (data?.data as Record<string,string>) || {}
+          const newMap = {...map, [st.id]: gradeVal || ""}
+          if(!gradeVal) delete (newMap as any)[st.id]
+          sb.from("halqati_settings").upsert({ id:"student_grades", data: newMap, updated_at: new Date().toISOString() }, {onConflict:"id"}).then()
+        })
       }
+      // حفظ محلي للدرجات
+      try{ const m = JSON.parse(localStorage.getItem("halqati_student_grades")||"{}"); if(gradeVal) m[editingStudentId]=gradeVal; else delete m[editingStudentId]; localStorage.setItem("halqati_student_grades", JSON.stringify(m)) }catch{}
     } else {
       const st: Student = {
-        id: uid(), name: studentForm.name.trim(), phone: normalizedPhone, circleId: effectiveCircleId, accessToken: uid() + uid().slice(0, 6),
+        id: uid(), name: studentForm.name.trim(), phone: normalizedPhone, circleId: effectiveCircleId, schoolGrade: gradeVal, accessToken: uid() + uid().slice(0, 6),
         memorizationLog: [], reviewLog: [], errorsLog: [], notes: [], visitLog: []
       }
       setStudents(prev => [...prev, st])
-      const sb = getSupabase(); if (sb) sb.from("halqati_students").upsert({ id: st.id, name: st.name, phone: st.phone, circle_id: st.circleId, access_token: st.accessToken, memorization_log: [], review_log: [], errors_log: [], notes: [], visit_log: [] }, { onConflict: "id" }).then()
+      const sb = getSupabase(); if (sb) {
+        sb.from("halqati_students").upsert({ id: st.id, name: st.name, phone: st.phone, circle_id: st.circleId, access_token: st.accessToken, school_grade: gradeVal || null, memorization_log: [], review_log: [], errors_log: [], notes: [], visit_log: [] }, { onConflict: "id" }).then(({error})=>{ if(error && String(error.message).includes("school_grade")) sb.from("halqati_students").upsert({ id: st.id, name: st.name, phone: st.phone, circle_id: st.circleId, access_token: st.accessToken, memorization_log: [], review_log: [], errors_log: [], notes: [], visit_log: [] }, { onConflict: "id" }).then() })
+        sb.from("halqati_settings").select("data").eq("id","student_grades").maybeSingle().then(({data})=>{
+          const map = (data?.data as Record<string,string>) || {}
+          if(gradeVal) map[st.id]=gradeVal
+          sb.from("halqati_settings").upsert({ id:"student_grades", data: map, updated_at: new Date().toISOString() }, {onConflict:"id"}).then()
+        })
+      }
+      try{ const m = JSON.parse(localStorage.getItem("halqati_student_grades")||"{}"); if(gradeVal) m[st.id]=gradeVal; localStorage.setItem("halqati_student_grades", JSON.stringify(m)) }catch{}
     }
-    setShowStudentModal(false); setStudentForm({ name: "", phone: "", circleId: "" }); setEditingStudentId(null); showToast("تم حفظ الطالب")
+    setShowStudentModal(false); setStudentForm({ name: "", phone: "", circleId: "", schoolGrade: "" }); setEditingStudentId(null); showToast("تم حفظ الطالب")
   }
   const deleteStudent = (id: string) => {
     if (!confirm("حذف الطالب وكل سجلاته؟")) return
     setStudents(prev => prev.filter(s => s.id !== id))
-    const sb = getSupabase(); if (sb) sb.from("halqati_students").delete().eq("id", id).then()
+    const sb = getSupabase(); if (sb) {
+      sb.from("halqati_students").delete().eq("id", id).then()
+      sb.from("halqati_settings").select("data").eq("id","student_grades").maybeSingle().then(({data})=>{
+        const map = (data?.data as Record<string,string>) || {}
+        if(map[id]){ delete (map as any)[id]; sb.from("halqati_settings").upsert({ id:"student_grades", data: map, updated_at: new Date().toISOString() }, {onConflict:"id"}).then() }
+      })
+    }
+    try{ const m=JSON.parse(localStorage.getItem("halqati_student_grades")||"{}"); delete m[id]; localStorage.setItem("halqati_student_grades", JSON.stringify(m)) }catch{}
     if (selectedStudentId === id) setSelectedStudentId(null)
     showToast("تم الحذف")
   }
@@ -1098,10 +1171,23 @@ export default function App() {
   })()
   const persistStudent = (updated: Student) => {
     setStudents(prev => prev.map(s => s.id === updated.id ? updated : s))
-    const sb = getSupabase(); if (sb) sb.from("halqati_students").upsert({
-      id: updated.id, name: updated.name, phone: updated.phone, circle_id: updated.circleId, access_token: updated.accessToken,
-      memorization_log: updated.memorizationLog, review_log: updated.reviewLog, errors_log: updated.errorsLog, notes: updated.notes, visit_log: updated.visitLog
-    }, { onConflict: "id" }).then()
+    const sb = getSupabase(); if (sb) {
+      sb.from("halqati_students").upsert({
+        id: updated.id, name: updated.name, phone: updated.phone, circle_id: updated.circleId, access_token: updated.accessToken, school_grade: (updated as any).schoolGrade || null,
+        memorization_log: updated.memorizationLog, review_log: updated.reviewLog, errors_log: updated.errorsLog, notes: updated.notes, visit_log: updated.visitLog
+      }, { onConflict: "id" }).then(({error})=>{ if(error && String(error.message).includes("school_grade")) sb.from("halqati_students").upsert({ id: updated.id, name: updated.name, phone: updated.phone, circle_id: updated.circleId, access_token: updated.accessToken, memorization_log: updated.memorizationLog, review_log: updated.reviewLog, errors_log: updated.errorsLog, notes: updated.notes, visit_log: updated.visitLog }, { onConflict: "id" }).then() })
+      if((updated as any).schoolGrade !== undefined){
+        sb.from("halqati_settings").select("data").eq("id","student_grades").maybeSingle().then(({data})=>{
+          const map = (data?.data as Record<string,string>) || {}
+          const g = (updated as any).schoolGrade?.trim()
+          if(g) map[updated.id]=g; else delete (map as any)[updated.id]
+          sb.from("halqati_settings").upsert({ id:"student_grades", data: map, updated_at: new Date().toISOString() }, {onConflict:"id"}).then()
+        })
+        try{ const m=JSON.parse(localStorage.getItem("halqati_student_grades")||"{}"); const g=(updated as any).schoolGrade?.trim(); if(g) m[updated.id]=g; else delete m[updated.id]; localStorage.setItem("halqati_student_grades", JSON.stringify(m)) }catch{}
+      }
+    } else {
+      try{ const m=JSON.parse(localStorage.getItem("halqati_student_grades")||"{}"); const g=(updated as any).schoolGrade?.trim(); if(g) m[updated.id]=g; else delete m[updated.id]; localStorage.setItem("halqati_student_grades", JSON.stringify(m)) }catch{}
+    }
   }
   const handleAddAnnouncement = () => {
     if (!announcementText.trim()) { showToast("اكتب نص الإعلان"); return }
@@ -1490,7 +1576,7 @@ export default function App() {
                       <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm shrink-0" style={{background: rec ? ATTENDANCE_COLOR[rec.status] : "#E7EFE7", color: rec ? "white":"#1F5E3A"}}>{s.name.trim().charAt(0)}</div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-[13px] truncate" style={{color:"#20281F"}}>{s.name} <span className="text-[11px] text-gray-400 font-normal">• {circleName2}</span></p>
+                          <p className="font-bold text-[13px] truncate" style={{color:"#20281F"}}>{s.name} <span className="text-[11px] text-gray-400 font-normal">• {circleName2}{s.schoolGrade ? " • " + s.schoolGrade : ""}</span></p>
                           {rec && <p className="text-[11px] text-gray-500">الحالة الحالية: <span className="font-bold" style={{color:ATTENDANCE_COLOR[rec.status]}}>{rec.status}</span></p>}
                         </div>
                         {rec ? <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${ATTENDANCE_BG[rec.status]}`}>{rec.status}</span> : <span className="px-2.5 py-1 rounded-full text-[11px] font-bold border bg-gray-50 text-gray-500 shrink-0">لم يُحضّر</span>}
@@ -1637,7 +1723,7 @@ export default function App() {
             ) : (currentUser?.role === "admin" || currentUser?.role === "teacher") ? (
               <button onClick={() => setShowTeacherPlan(true)} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">📅 الخطة</button>
             ) : null}
-            <button onClick={() => { const autoCircle = currentUser?.role === "teacher" ? (currentUser.circleId || "") : (filterCircle !== "all" ? filterCircle : ""); setStudentForm({ name: "", phone: "", circleId: autoCircle }); setEditingStudentId(null); setShowStudentModal(true) }} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">+ إضافة طالب</button>
+            <button onClick={() => { const autoCircle = currentUser?.role === "teacher" ? (currentUser.circleId || "") : (filterCircle !== "all" ? filterCircle : ""); setStudentForm({ name: "", phone: "", circleId: autoCircle, schoolGrade: "" }); setEditingStudentId(null); setShowStudentModal(true) }} className="flex-1 py-3 rounded-xl bg-[#1F5E3A] hover:bg-[#163F27] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm">+ إضافة طالب</button>
           </div>
         </div>
 
@@ -1785,7 +1871,7 @@ export default function App() {
                       </div>
                       <div>
                         <p className="font-bold text-[13px]" style={{ color: "#20281F" }}>{s.name}</p>
-                        <p className="text-[11px] text-gray-500">{circleName2} • {s.phone || "—"}</p>
+                        <p className="text-[11px] text-gray-500">{circleName2}{s.schoolGrade ? " • " + s.schoolGrade : ""} • {s.phone || "—"}</p>
                       </div>
                     </div>
 
@@ -1794,7 +1880,7 @@ export default function App() {
 
                   <div className="flex gap-1.5">
                     <button onClick={(e) => { e.stopPropagation(); setSelectedStudentId(s.id) }} className="flex-1 py-1.5 rounded-xl bg-[#1F5E3A] text-white text-xs font-bold group-hover:bg-[#163F27] transition">عرض التفاصيل</button>
-                    {currentUser?.role !== "admin" && <button onClick={(e) => { e.stopPropagation(); setEditingStudentId(s.id); setStudentForm({ name: s.name, phone: s.phone, circleId: s.circleId || "" }); setShowStudentModal(true) }} className="px-3 py-1.5 rounded-xl bg-white border text-xs">تعديل</button>}
+                    {currentUser?.role !== "admin" && <button onClick={(e) => { e.stopPropagation(); setEditingStudentId(s.id); setStudentForm({ name: s.name, phone: s.phone, circleId: s.circleId || "", schoolGrade: (s as any).schoolGrade || "" }); setShowStudentModal(true) }} className="px-3 py-1.5 rounded-xl bg-white border text-xs">تعديل</button>}
                     {currentUser?.role !== "admin" && <button onClick={(e) => { e.stopPropagation(); deleteStudent(s.id) }} className="px-2 py-1.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs">حذف</button>}
                   </div>
                 </div>
@@ -1880,6 +1966,12 @@ export default function App() {
           <div className="grid gap-3">
             <div><label className="text-xs font-bold">اسم الطالب *</label><input value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} placeholder="اسم الطالب الثلاثي" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-[#1F5E3A]" /></div>
             <div><label className="text-xs font-bold">رقم جوال ولي الأمر (اختياري)</label><input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} dir="ltr" placeholder="05XXXXXXXX" className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm outline-none focus:ring-2 focus:ring-[#1F5E3A]" /><p className="text-[10px] text-gray-400 mt-1">أدخل 05XXXXXXXX فقط — سيُحوّل تلقائياً إلى 966... عند إنشاء رابط واتساب</p></div>
+            <div><label className="text-xs font-bold">الصف</label>
+              <select value={studentForm.schoolGrade} onChange={e => setStudentForm({ ...studentForm, schoolGrade: e.target.value })} className="w-full mt-1 px-3 py-2.5 rounded-xl border text-sm bg-white">
+                <option value="">اختر الصف (اختياري)</option>
+                {SCHOOL_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
             {currentUser?.role === "teacher" ? (
               <div className="bg-[#FAF9F4] rounded-xl p-3 border border-[#E1E5DA] text-center">
                 <p className="text-[11px] font-bold text-gray-500">{editingStudentId ? "حلقة الطالب" : "سيتم إضافة الطالب تلقائياً إلى حلقتك"}</p>
@@ -2300,10 +2392,15 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
     const sb = getSupabase()
     if (!sb) return
     let cancelled = false
-    const toStudent = (row: any): Student => ({
-      id: row.id, name: row.name, phone: row.phone || "", circleId: row.circle_id,
-      accessToken: row.access_token, memorizationLog: row.memorization_log || [], reviewLog: row.review_log || [], errorsLog: row.errors_log || [], notes: row.notes || [], visitLog: row.visit_log || []
-    })
+    const toStudent = (row: any): Student => {
+      let g = (row as any).school_grade as string | undefined
+      if(!g){ try{ const m=JSON.parse(localStorage.getItem("halqati_student_grades")||"{}"); g=m[row.id] }catch{} }
+      // أيضاً جرّب جلب من الإعدادات إن لم توجد محلياً (سيتم تحديثها في الخلفية)
+      return {
+        id: row.id, name: row.name, phone: row.phone || "", circleId: row.circle_id,
+        accessToken: row.access_token, schoolGrade: g || undefined, memorizationLog: row.memorization_log || [], reviewLog: row.review_log || [], errorsLog: row.errors_log || [], notes: row.notes || [], visitLog: row.visit_log || []
+      }
+    }
     const fetchFresh = async () => {
       try {
         const { data, error } = await sb.from("halqati_students").select("*").eq("access_token", token).maybeSingle()
@@ -2446,7 +2543,7 @@ function ParentTokenView({ student, circles, staff, attendance, plan }: { studen
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-xl shrink-0" style={{background:"#1F5E3A"}}>{studentLive.name.trim().charAt(0)}</div>
           <div className="flex-1 min-w-0">
             <h3 className="font-black text-lg" style={{color:"#163F27"}}>{studentLive.name}</h3>
-            <p className="text-xs text-gray-500 mt-1 truncate">{circleName} • حفظ: {studentLive.memorizationLog.length} • مراجعة: {studentLive.reviewLog.length} • أخطاء: {studentLive.errorsLog.length}</p>
+            <p className="text-xs text-gray-500 mt-1 truncate">{circleName}{(studentLive as any).schoolGrade ? " • " + (studentLive as any).schoolGrade : ""} • حفظ: {studentLive.memorizationLog.length} • مراجعة: {studentLive.reviewLog.length} • أخطاء: {studentLive.errorsLog.length}</p>
           </div>
           <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
             <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">متابعة ولي الأمر</span>
@@ -2922,7 +3019,7 @@ function StudentDetail({ student, circles, staff, attendance, currentUserId, pla
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-lg" style={{ background: "#1F5E3A" }}>{student.name.charAt(0)}</div>
           <div>
             <h3 className="font-black text-[15px]" style={{ color: "#163F27" }}>{student.name}</h3>
-            <p className="text-xs text-gray-500">{circleName} • {student.phone || "بدون جوال"} • حفظ: {student.memorizationLog.length} • مراجعة: {student.reviewLog.length}</p>
+            <p className="text-xs text-gray-500">{circleName}{(student as any).schoolGrade ? " • " + (student as any).schoolGrade : ""} • {student.phone || "بدون جوال"} • حفظ: {student.memorizationLog.length} • مراجعة: {student.reviewLog.length}</p>
           </div>
         </div>
         <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200">✕</button>
