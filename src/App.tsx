@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { createClient, SupabaseClient } from "@supabase/supabase-js"
 
+// GitHub Pages is an isolated, login-free demonstration. Real installations keep
+// their existing storage and cloud configuration unchanged.
+const DEMO_MODE = window.location.hostname.endsWith(".github.io") || new URLSearchParams(window.location.search).get("demo") === "1"
+const localStorage = {
+  getItem: (key: string) => window.localStorage.getItem(DEMO_MODE ? `demo_${key}` : key),
+  setItem: (key: string, value: string) => window.localStorage.setItem(DEMO_MODE ? `demo_${key}` : key, value),
+  removeItem: (key: string) => window.localStorage.removeItem(DEMO_MODE ? `demo_${key}` : key),
+}
+
 // ===================== أنواع البيانات =====================
 type Role = "owner" | "admin" | "supervisor" | "teacher"
 type Grade = "ممتاز" | "جيد" | "جيد جداً" | "يحتاج إعادة" | "بدون تقدير"
@@ -238,6 +247,7 @@ function getSupabaseConfig() {
 }
 let supabaseClient: SupabaseClient | null = null
 function getSupabase(): SupabaseClient | null {
+  if (DEMO_MODE) return null
   const { url, anonKey, isConfigured } = getSupabaseConfig()
   if (!isConfigured) return null
   if (supabaseClient) return supabaseClient
@@ -560,22 +570,52 @@ function AttendanceReportView({ students, circles, attendance, date, onClose }: 
   )
 }
 
+// Sample data is created once per browser and never sent to Supabase.
+function createDemoData() {
+  const date = (offset: number) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10) }
+  const circles: Circle[] = ["حلقة الإمام حفص", "حلقة النور", "حلقة البيان"].map((name, i) => ({ id: `demo-circle-${i}`, name }))
+  const staff: Staff[] = [
+    { id: "demo-owner", name: "مدير الحلقة التجريبي", phone: "0500000000", role: "owner", circleId: null },
+    { id: "demo-admin", name: "عبدالله الإداري", phone: "0500000001", role: "admin", circleId: null },
+    { id: "demo-supervisor", name: "خالد المشرف", phone: "0500000002", role: "supervisor", circleId: null },
+    ...["أحمد المعلم", "محمد المعلم", "يوسف المعلم"].map((name, i): Staff => ({ id: `demo-teacher-${i}`, name, phone: `050000000${i + 3}`, role: "teacher", circleId: circles[i].id }))
+  ]
+  const names = ["عبدالله أحمد", "عبدالرحمن محمد", "محمد خالد", "يوسف إبراهيم", "إبراهيم علي", "سامي عبدالله", "فيصل عمر", "عمر سعيد", "خالد فهد", "علي سعد", "سعد ناصر", "ناصر أحمد", "عبدالعزيز محمد", "زيد علي", "أنس خالد"]
+  const students: Student[] = names.map((name, i) => {
+    const teacherId = `demo-teacher-${i % 3}`
+    return { id: `demo-student-${i}`, name, phone: `05010000${String(i).padStart(2, "0")}`, circleId: circles[i % 3].id, accessToken: `demo-student-token-${i}`, schoolGrade: SCHOOL_GRADES[i % SCHOOL_GRADES.length], targetFacesWeekly: 5,
+      memorizationLog: [0, 1, 2].map((n) => ({ id: `demo-mem-${i}-${n}`, date: date(-n * 2), surahNumber: 2, surahName: "البقرة", fromAyah: 1 + n * 5, toAyah: 5 + n * 5, ayahCount: 5, grade: (["ممتاز", "جيد جداً", "جيد"] as Grade[])[(i + n) % 3], teacherId })),
+      reviewLog: [{ id: `demo-review-${i}`, date: date(-1), reviewType: i % 2 ? "large" : "small", surahNumber: 78, surahName: "النبأ", fromAyah: 1, toAyah: 20, ayahCount: 20, grade: "جيد جداً", teacherId }],
+      errorsLog: i % 3 === 0 ? [{ id: `demo-error-${i}`, date: date(-1), type: "تردد", description: "يحتاج إلى مزيد من المراجعة" }] : [],
+      notes: [{ id: `demo-note-${i}`, date: date(-1), text: "أحسنت، واصل المراجعة اليومية", authorId: teacherId }], visitLog: [] }
+  })
+  const attendance: AttendanceRecord[] = students.flatMap((student, i) => [0, 1, 2].map(n => ({ id: `demo-att-${i}-${n}`, studentId: student.id, date: date(-n), status: (i % 7 === 0 ? "متأخر" : i % 11 === 0 ? "غائب بعذر" : "حاضر") as AttendanceStatus, recordedBy: "demo-owner", createdAt: new Date().toISOString() })))
+  const plan: AcademicPlan = { startDate: date(-60), endDate: date(120), activeWeekdays: [0, 1, 2, 3, 4], holidays: [] }
+  const announcements: Announcement[] = [{ id: "demo-announcement", text: "أهلاً بكم في حلقتي! نذكّر الطلاب بالمراجعة اليومية والاستعداد للتسميع.", createdAt: new Date().toISOString(), authorId: "demo-owner", authorName: "مدير الحلقة التجريبي" }]
+  return { circles, staff, students, attendance, plan, announcements }
+}
+const demoData = DEMO_MODE ? createDemoData() : null
+function initialData<T>(key: string, fallback: T): T {
+  if (!DEMO_MODE) return fallback
+  try { const saved = localStorage.getItem(key); return saved ? JSON.parse(saved) as T : fallback } catch { return fallback }
+}
+
 // ===================== App =====================
 export default function App() {
   // Data
-  const [circles, setCircles] = useState<Circle[]>([])
-  const [staff, setStaff] = useState<Staff[]>([])
-  const [students, setStudents] = useState<Student[]>([])
-  const [plan, setPlan] = useState<AcademicPlan>({ startDate: todayISO(), endDate: todayISO(), activeWeekdays: [0, 1, 2, 3, 4], holidays: [] })
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [circles, setCircles] = useState<Circle[]>(() => initialData("halqati_circles", demoData?.circles || []))
+  const [staff, setStaff] = useState<Staff[]>(() => initialData("halqati_staff", demoData?.staff || []))
+  const [students, setStudents] = useState<Student[]>(() => initialData("halqati_students", demoData?.students || []))
+  const [plan, setPlan] = useState<AcademicPlan>(() => initialData("halqati_academic_plan", demoData?.plan || { startDate: todayISO(), endDate: todayISO(), activeWeekdays: [0, 1, 2, 3, 4], holidays: [] }))
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => initialData("halqati_attendance", demoData?.attendance || []))
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => initialData("halqati_announcements", demoData?.announcements || []))
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
   const [announcementText, setAnnouncementText] = useState("")
   const [attendanceDate, setAttendanceDate] = useState<string>(todayISO())
   const [attendanceNote, setAttendanceNote] = useState<Record<string,string>>({})
   const [showAttendanceReport, setShowAttendanceReport] = useState(false)
   const [supervisorCircle, setSupervisorCircle] = useState<string>("all")
-  const [currentUserId, setCurrentUserId] = useState<string | null>(() => localStorage.getItem("halqati_session"))
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => DEMO_MODE ? (new URLSearchParams(window.location.search).has("t") ? null : "demo-owner") : localStorage.getItem("halqati_session"))
   const [toast, setToast] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [filterCircle, setFilterCircle] = useState<string>("all")
@@ -1480,11 +1520,13 @@ export default function App() {
           <div className="flex items-center gap-2">
             {isOwner && <button onClick={() => setPlanModal(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
             {(currentUser?.role === "admin" || currentUser?.role === "teacher") && <button onClick={() => setShowTeacherPlan(true)} className="hidden sm:inline-flex px-3 py-1.5 rounded-full bg-[#E7EFE7] hover:bg-[#d8ead8] text-[#1F5E3A] text-xs font-bold border border-[#E1E5DA] transition">📅 الخطة السنوية</button>}
-            {isOwner && <button onClick={() => setSupabaseModal(true)} className="px-3 py-1.5 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-gray-50">⚙️ Supabase</button>}
-            <button onClick={() => { setCurrentUserId(null); showToast("تم تسجيل الخروج") }} className="px-3 py-1.5 rounded-full bg-[#B3492C] hover:bg-[#963d25] text-white text-xs font-bold">خروج</button>
+            {isOwner && !DEMO_MODE && <button onClick={() => setSupabaseModal(true)} className="px-3 py-1.5 rounded-full bg-white border border-[#E1E5DA] text-xs font-bold text-[#1F5E3A] hover:bg-gray-50">⚙️ Supabase</button>}
+            {!DEMO_MODE && <button onClick={() => { setCurrentUserId(null); showToast("تم تسجيل الخروج") }} className="px-3 py-1.5 rounded-full bg-[#B3492C] hover:bg-[#963d25] text-white text-xs font-bold">خروج</button>}
           </div>
         </div>
       </header>
+
+      {DEMO_MODE && <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-center text-xs sm:text-sm px-4 py-2">نسخة تجريبية ببيانات افتراضية — التغييرات محفوظة في هذا المتصفح فقط ولا تُرسل إلى السحابة. <button className="underline font-bold mr-2" onClick={() => { if (window.confirm("هل تريد إعادة البيانات التجريبية وحذف التغييرات المحلية؟")) { ["halqati_circles", "halqati_staff", "halqati_students", "halqati_academic_plan", "halqati_attendance", "halqati_announcements", "halqati_student_grades", "halqati_session"].forEach(key => localStorage.removeItem(key)); window.location.reload() } }}>إعادة البيانات التجريبية</button></div>}
 
       {/* صفحة سجل التحضير المرتب حسب الحلقات — تظهر بعد الضغط على الزر وتتجدد تلقائياً */}
       {showAttendanceReport && (
